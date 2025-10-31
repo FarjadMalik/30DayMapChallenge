@@ -2,7 +2,7 @@
 
 My contributions for the #30DayMapChallenge, a daily mapping challenge open to everyone.
 
-![Themes for the maps. See more below.](images/30dmc_2025.png)
+![Themes for the maps. See more below.](img/30dmc_2025.png)
 
 | Date       | Name                  | Description                                                                                                                                                                                                                                                                           |
 |------------|-----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
