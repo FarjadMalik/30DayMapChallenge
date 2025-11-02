@@ -6,6 +6,8 @@ dist/
 wheels/
 *.egg-info
 uv.lock
+.ipynb_checkpoints
+data
 
 # Virtual environments
 .venv
