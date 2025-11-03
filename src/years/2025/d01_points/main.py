@@ -1,7 +1,10 @@
 import folium
 import geopandas as gpd
 import pandas as pd
+import numpy as np
+import rasterio
 
+from rasterio.plot import reshape_as_image
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -10,23 +13,52 @@ logger = get_logger(__name__)
 def create_poi_map():
     logger.info("Hello from d01_points!")
 
-    # 1. Load the shapefile (replace the path with your actual .shp file)
+    # Load the shapefile (replace the path with your actual .shp file)
     shapefile_path = "data/pakistan_admin/gadm41_PAK_3.shp"
     admin_gdf = gpd.read_file(shapefile_path)
 
-    # 2. Ensure the CRS is WGS84 (EPSG:4326) so it works with Folium
+    # Ensure the CRS is WGS84 (EPSG:4326) so it works with Folium
     if admin_gdf is not None and admin_gdf.crs.to_string() != "EPSG:4326":
         admin_gdf = admin_gdf.to_crs(epsg=4326)
 
-    # 3. Calculate a center for the map, e.g., the mean of the bounds
+    # Calculate a center for the map, e.g., the mean of the bounds
     bounds = admin_gdf.total_bounds  # [minx, miny, maxx, maxy]
     center_lat = (bounds[1] + bounds[3]) / 2
     center_lon = (bounds[0] + bounds[2]) / 2
 
-    # 4. Create the Folium map, centered on Pakistan (admin boundaries center)
+    # Create the Folium map, centered on Pakistan (admin boundaries center)
     pk_basemap = folium.Map(location=[center_lat, center_lon], zoom_start=6, tiles='OpenStreetMap')
 
-    # 5. Add the administrative boundaries layer
+    # Load land cover land use layer 
+    lulc_tif_path = "data/PAK_misc/copernicus_lulc/copernicus_lulc__PAK.tif"
+    with rasterio.open(lulc_tif_path) as src:
+        bounds = src.bounds
+        img = src.read()
+        crs = src.crs
+    
+    # logger.info(f"LULC Raster CRS: {crs}")
+    # logger.info(f"LULC bounds: {bounds}")
+    # logger.info(f"LULC img shape: {img.shape}")
+    
+    # Reshape the image for proper display (bands, rows, cols) -> (rows, cols, bands)
+    img = reshape_as_image(img)
+    logger.info(f"LULC reshaped img shape: {img.shape}")
+
+    # Normalize image values to 0–1 for display
+    img = img.astype(float)
+    img = (img - np.nanmin(img)) / (np.nanmax(img) - np.nanmin(img))
+
+    # Add LULC raster as an image overlay
+    folium.raster_layers.ImageOverlay(
+        image=img,
+        bounds=[[bounds.bottom, bounds.left], [bounds.top, bounds.right]],
+        opacity=0.6,
+        name='Copernicus LULC Overlay',
+        interactive=True,
+        cross_origin=False,
+    ).add_to(pk_basemap)
+
+    # Add the administrative boundaries layer
     folium.GeoJson(
         admin_gdf,
         name='Administrative Boundaries',
@@ -52,10 +84,11 @@ def create_poi_map():
     logger.info(f"POI Data Length – \n{len(poi_data)}")
     # logger.info(f"POI Data Coverage – \n{poi_data['amenity'].unique()}")
 
-    # hospitals = poi_data[poi_data['amenity'] == 'clinic;hospital']
+    aoi_df = poi_data[poi_data['amenity'] == 'university']
     # hospitals = poi_data.query("amenity == 'clinic;hospital' or amenity == 'hospital' or amenity == 'clinic'")
-    amenity_list = ['clinic;hospital', 'hospital', 'clinic', 'pharmacy', 'doctors', 'food', 'waste_basket']
-    aoi_df = poi_data.loc[poi_data['amenity'].isin(amenity_list)]
+    # amenity_list = ['clinic;hospital', 'hospital', 'clinic', 'pharmacy', 'doctors', 'food', 'waste_basket']
+    # amenity_list = ['college', 'university', 'prep_school', 'research_institute', 'school', 'kindergarten']
+    # aoi_df = poi_data.loc[poi_data['amenity'].isin(amenity_list)]
     logger.info(f"Amnesties of interest Data Length – \n{len(aoi_df)}")
 
     # Option 1: Add points of interest to the map, using geojson code directly for shapefile
@@ -79,12 +112,13 @@ def create_poi_map():
 
     # Option 2: Add points of interest to the map, iterating through GeoDataFrame
     # Define a function to pick circle color based on amenity
+    # 'college', 'university', 'prep_school', 'research_institute', 'school', 'kindergarten'
     def amenity_color(value: str | None) -> str:
-        if value == "food":
+        if value == "college" or value == "university":
             return "blue"
-        elif value == "waste_basket":
+        elif value == "prep_school":
             return "green"
-        elif value == "doctors" or value == "pharmacy":
+        elif value == "school" or value == "kindergarten":
             return "purple"
         else:
             return "red"
@@ -128,6 +162,9 @@ def create_poi_map():
             fill_opacity=0.6,
             popup=folium.Popup(pop_text, max_width=300)
         ).add_to(pk_basemap)
+    
+    # Allows toggling between layers interactively 
+    folium.LayerControl().add_to(pk_basemap)
 
     # Save the map to an HTML file
     pk_basemap.save("src/years/2025/d01_points/pk_poi_map.html")
