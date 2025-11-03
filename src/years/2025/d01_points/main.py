@@ -4,14 +4,20 @@ import pandas as pd
 import numpy as np
 import rasterio
 
+from pathlib import Path
 from rasterio.plot import reshape_as_image
 from src.utils.logger import get_logger
+from src.utils.helpers import get_relative_path
 
 logger = get_logger(__name__)
 
 
-def create_poi_map():
-    logger.info("Hello from d01_points!")
+def create_poi_map(path_dir: str, file_html: str):
+    """
+    Creates points of interest map, for educational institutes.
+    
+    """
+    logger.info(f"Hello from {path_dir}!")
 
     # Load the shapefile (replace the path with your actual .shp file)
     shapefile_path = "data/pakistan_admin/gadm41_PAK_3.shp"
@@ -167,9 +173,10 @@ def create_poi_map():
     folium.LayerControl().add_to(pk_basemap)
 
     # Save the map to an HTML file
-    pk_basemap.save("src/years/2025/d01_points/pk_poi_map.html")
-    logger.info("Map created – open 'admin_boundaries_map.html' to view.")
+    pk_basemap.save(f"{Path(path_dir).parent}/{file_html}.html")
+    logger.info(f"Map created – open '{file_html}.html' to view.")
 
 
 if __name__ == "__main__":
-    create_poi_map()
+    out_filename = 'pk_poi_map'
+    create_poi_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)
