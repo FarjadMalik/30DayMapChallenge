@@ -19,7 +19,7 @@ def create_poi_map(path_dir: str, file_html: str):
     """
     logger.info(f"Hello from {path_dir}!")
 
-    # Load the shapefile (replace the path with your actual .shp file)
+    # Load the shapefile for pakistan admin boundaries
     shapefile_path = "data/pakistan_admin/gadm41_PAK_3.shp"
     admin_gdf = gpd.read_file(shapefile_path)
 

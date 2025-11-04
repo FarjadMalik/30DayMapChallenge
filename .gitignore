@@ -17,3 +17,10 @@ data
 
 # ENV files
 .env
+.webui_secret_key
+
+# temporary files
+src\notebooks\Folium_refresher.ipynb
+
+# HTML files
+*.html
