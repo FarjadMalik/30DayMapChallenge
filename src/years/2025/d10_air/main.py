@@ -44,5 +44,5 @@ def create_polygon_map(path_dir: str, file_html: str):
 
 
 if __name__ == "__main__":
-    out_filename = 'earth'
+    out_filename = 'air_quality_lahore'
     create_polygon_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)
