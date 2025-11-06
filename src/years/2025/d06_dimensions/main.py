@@ -12,7 +12,7 @@ from src.utils.helpers import get_relative_path
 logger = get_logger(__name__)
 
 
-def create_polygon_map(path_dir: str, file_html: str):
+def create_dimensions_map(path_dir: str, file_html: str):
     """
     Creates polygon map for Day 3 exercises
     
@@ -45,4 +45,4 @@ def create_polygon_map(path_dir: str, file_html: str):
 
 if __name__ == "__main__":
     out_filename = 'earth'
-    create_polygon_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)
+    create_dimensions_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)
