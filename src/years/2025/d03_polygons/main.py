@@ -1,10 +1,11 @@
 import fiona
 import folium
+import pandas as pd
 import geopandas as gpd
 
+from branca.element import Template, MacroElement
 from pathlib import Path
-from shapely.geometry import box
-from rasterio.plot import reshape_as_image
+from shapely.geometry import MultiPolygon, GeometryCollection, Polygon
 from src.utils.logger import get_logger
 from src.utils.helpers import get_relative_path
 
@@ -35,62 +36,101 @@ def create_polygon_map(path_dir: str, file_html: str):
     # Create the Folium map, centered on Pakistan (admin boundaries center)
     basemap = folium.Map(location=[center_lat, center_lon], zoom_start=6, tiles='OpenStreetMap')
 
-    # Add the administrative boundaries layer
-    folium.GeoJson(
-        admin_gdf,
-        name='Administrative Boundaries',
-        style_function=lambda feature: {
-            'fillColor': 'none',
-            'color': 'blue',
-            'weight': 1,
-            'dashArray': '5, 5'
-        }
-    ).add_to(basemap)
+    # No need to add the administrative boundaries layer
 
     # Load hydro/rivers layer from geopackage
-    gdb_path = "data/HydroRIVERS_v10_as.gdb"
-    logger.info(f"HydroRIVERS_v10 gdb layers: {fiona.listlayers(gdb_path)}")
-    # hydro_gdf = gpd.read_file(gdb_path, layer='HydroRIVERS_v10_as')    
-    # hydro_gdf= gpd.clip(hydro_gdf, admin_gdf)    
+    file_ipc_food_insecurity = "data/PAK_misc/AcuteFoodInsecurity_ipc_pak_area_long_latest.csv"
+    ipc_df = pd.read_csv(file_ipc_food_insecurity)
+    # Filter for current projection and get all phases/levels (1-5)
+    ipc_df = ipc_df.loc[(ipc_df['Validity period'] == 'first projection') & (ipc_df['Phase'] == 'all')]
+    # Keep only relevant columns
+    ipc_df = ipc_df[['Date of analysis', 'Area', 'Level 1', 'Number', 'Percentage']]
 
-    # Open the GDB layer with Fiona
-    # Use Fiona's bbox filter to read only features within bounds
-    with fiona.open(gdb_path, layer='HydroRIVERS_v10_as', bbox=(bounds[0], bounds[1], bounds[2], bounds[3])) as src:
-        hydro_gdf = gpd.GeoDataFrame.from_features(src, crs=src.crs)
-        
-    
-    logger.info(f"Hydro gdf len: {len(hydro_gdf)}")
-    logger.info(f"Hydro gdf crs: {hydro_gdf.crs}")
-    logger.info(f"Hydro gdf head: {hydro_gdf.head()}")
-    
-    with fiona.open(gdb_path, layer='HydroRIVERS_v10_as') as src:
-        # Create a generator for features that intersect the bbox
-        filtered_features = (
-            feat for feat in src 
-            if box(*src.bounds).intersects(box(bounds[0], bounds[1], bounds[2], bounds[3]))
-        )
-        
-        # Convert filtered features to a GeoDataFrame
-        hydro_gdf = gpd.GeoDataFrame.from_features(filtered_features, crs=src.crs)
+    # Read ipc geojson
+    ipc_pak_geojson = "data/PAK_misc/ipc_pak.geojson"
+    ipc_gdf = gpd.read_file(ipc_pak_geojson)
+    # Keep only relevant columns
+    ipc_gdf = ipc_gdf[['title', 'geometry', 'confidence_level', 'overall_phase', 'color', 'estimated_population']]
 
-    logger.info(f"Hydro gdf len: {len(hydro_gdf)}")
-    logger.info(f"Hydro gdf crs: {hydro_gdf.crs}")
-    logger.info(f"Hydro gdf head: {hydro_gdf.head()}")
+    # Merge ipc_gdf with ipc_df to get phase information
+    ipc_pak_gdf = ipc_gdf.merge(ipc_df, left_on='title', right_on='Area', how='inner')
 
-    # Add hydro/rivers layer to map
+    # Function to convert GeometryCollection to MultiPolygon
+    def convert_geomcollection_to_multipolygon(geom):
+        if isinstance(geom, GeometryCollection):
+            # Extract polygons from GeometryCollection parts
+            polygons = [part for part in geom.geoms if isinstance(part, Polygon)]
+            # Return MultiPolygon constructed from polygons
+            return MultiPolygon(polygons)
+        else:
+            return geom
+
+    # Apply the conversion function to the geometry column
+    ipc_pak_gdf['geometry'] = ipc_pak_gdf['geometry'].apply(convert_geomcollection_to_multipolygon)
+    # Clean up
+    del ipc_gdf, ipc_df
+
+    # Add IPC polygons to the map
     folium.GeoJson(
-        hydro_gdf,
-        name='Hydro Rivers',
+        ipc_pak_gdf,
+        name='Acute Food Insecurity Areas Pakistan',
         style_function=lambda feature: {
-            'fillColor': 'none',
-            'color': 'blue',
+            'fillColor': feature['properties']['color'],
+            'color': feature['properties']['color'],
             'weight': 1,
+            'fillOpacity': 0.5
         },
-        # highlight_function=lambda feature: {
-        #     "weight": 3,
-        #     "color": "red"
-        # }
+        tooltip=folium.GeoJsonTooltip(
+            fields=['Area', 'Level 1', 'overall_phase', 'estimated_population', 'Percentage', 
+                    'confidence_level', 'Date of analysis',],
+            aliases=['District:', 'Province:',  'Overall Level:', 'Number Affected:', 'Percentage Affected:', 
+                    'Confidence Level:', 'Date of Analysis:'],
+            localize=True
+        )
     ).add_to(basemap)
+
+    # Add legend for phases/colors
+    title_html = '''
+    <h3 align="center" style="font-size:20px; font-weight:bold; margin-top:10px">
+        IPC Acute Food Insecurity Levels - Pakistan
+    </h3>
+    '''
+    basemap.get_root().html.add_child(folium.Element(title_html))
+
+    # Define your color mapping for phases, e.g.:
+    # phase_color_dict = {
+    #     1: '#fae61e', # Phase 1 color
+    #     2: '#e67800', # Phase 2 color
+    #     3: '#c80000', # Phase 3 color
+    #     4: '#640000', # Phase 4 color
+    #     5: '#000000', # Phase 5 color
+    # }
+
+    legend_html = """
+    {% macro html(this, kwargs) %}
+    <div style="
+    position: fixed; 
+    bottom: 50px; left: 50px; width: 180px; height: 150px; 
+    border:2px solid grey; z-index:9999; font-size:14px;
+    background-color: white;
+    opacity: 0.8;
+    padding: 10px;
+    ">
+    <b>Level Legend</b><br>
+    <i style="background:#fae61e;width:18px;height:18px;float:left;margin-right:8px;opacity:0.7;"></i>Level 1<br>
+    <i style="background:#e67800;width:18px;height:18px;float:left;margin-right:8px;opacity:0.7;"></i>Level 2<br>
+    <i style="background:#c80000;width:18px;height:18px;float:left;margin-right:8px;opacity:0.7;"></i>Level 3<br>
+    <i style="background:#640000;width:18px;height:18px;float:left;margin-right:8px;opacity:0.7;"></i>Level 4<br>
+    <i style="background:#000000;width:18px;height:18px;float:left;margin-right:8px;opacity:0.7;"></i>Level 5<br>
+    </div>
+    {% endmacro %}
+    """
+
+    legend = MacroElement()
+    legend._template = Template(legend_html)
+
+    # Add legend to your map
+    basemap.get_root().add_child(legend)
 
     # Allows toggling between layers interactively 
     folium.LayerControl().add_to(basemap)
