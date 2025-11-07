@@ -44,5 +44,9 @@ def create_air_map(path_dir: str, file_html: str):
 
 
 if __name__ == "__main__":
+    # https://storymaps.arcgis.com/stories/9a728e6682334385bfa3e5f4727f668a
+    # https://aqicn.org/city/lahore/
+    # https://www.wunderground.com/history/monthly/pk/lahore (historical weather data)
+    # https://public.opendatasoft.com/explore/dataset/openaq/
     out_filename = 'air_quality_lahore'
     create_air_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)

@@ -1,13 +1,10 @@
 import numpy as np
-import folium
 import rasterio
 import geopandas as gpd
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
 
-from pathlib import Path
 from rasterio.mask import mask
-from rasterio.plot import reshape_as_image
 from src.utils.logger import get_logger
 from src.utils.helpers import get_relative_path
 
@@ -32,14 +29,6 @@ def create_dimensions_map(path_dir: str, file_html: str):
 
     # Filter for Islamabad Capital Territory to focus the map and plot population density over time    
     isb_gdf = admin_gdf[admin_gdf['NAME_3'] == 'Shikarpur']
-
-    # Calculate a center for the map, e.g., the mean of the bounds
-    bounds = isb_gdf.total_bounds  # [minx, miny, maxx, maxy]
-    center_lat = (bounds[1] + bounds[3]) / 2
-    center_lon = (bounds[0] + bounds[2]) / 2
-
-    # Create the Folium map, centered on Pakistan (admin boundaries center)
-    basemap = folium.Map(location=[center_lat, center_lon], zoom_start=11, tiles='OpenStreetMap')
 
     # Load population density raster data for Islamabad# 2. Load population density raster for year 2015 and 2020
     r2015 = rasterio.open("data/PAK_misc/pak_pop_2015_CN_100m_R2025A_v1.tif")
@@ -135,13 +124,6 @@ def create_dimensions_map(path_dir: str, file_html: str):
         scene=dict(zaxis_title='Density per grid cell')
     )
     fig.show()
-
-
-    # # Allows toggling between layers interactively 
-    # folium.LayerControl().add_to(basemap)
-    # # Save the map to an HTML file
-    # basemap.save(f"{Path(path_dir).parent}/{file_html}.html")
-    # logger.info(f"Map created – open '{file_html}.html' to view.")
 
 
 if __name__ == "__main__":

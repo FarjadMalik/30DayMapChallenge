@@ -44,5 +44,6 @@ def create_analog_map(path_dir: str, file_html: str):
 
 
 if __name__ == "__main__":
+    # Draw one of the maps from analog folder
     out_filename = 'analog'
     create_analog_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)

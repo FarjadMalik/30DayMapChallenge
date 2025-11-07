@@ -44,5 +44,7 @@ def create_urban_map(path_dir: str, file_html: str):
 
 
 if __name__ == "__main__":
-    out_filename = 'urbanization_trends'
+    # TODO: Plot natural green spaces in urban areas of pakistan isb, khi, lhr
+    # Use natural shape file from OSM and filter by urban areas
+    out_filename = 'green_urban_map'
     create_urban_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)
