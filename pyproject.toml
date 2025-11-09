@@ -23,6 +23,7 @@ dependencies = [
     "netcdf4>=1.7.3",
     "notebook>=7.4.7",
     "numpy>=1.26.4",
+    "opencv-python>=4.11.0.86",
     "openmeteo-requests>=1.7.4",
     "osmnx==1.9.4",
     "pandas==2.2.3",
