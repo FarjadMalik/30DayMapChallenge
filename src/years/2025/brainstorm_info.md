@@ -161,3 +161,5 @@ If you like, I can **find and send direct download links** (and verify coordinat
 [9]: https://geo.btaa.org/catalog/a64d1ff2-7158-48c7-887d-6af69ce21906?utm_source=chatgpt.com "Pakistan - Subnational Administrative Boundaries - Big Ten Academic Alliance Geoportal"
 [10]: https://www.reddit.com/r/openstreetmap/comments/i3v1zj?utm_source=chatgpt.com "How can I export or query all hospitals from Open Street Map?"
 [11]: https://www.reddit.com/r/QGIS/comments/1j7ndnq?utm_source=chatgpt.com "Is OpenStreetMap a good source of maps for thesis?"
+
+

@@ -43,5 +43,6 @@ def generate_map(path_dir: str, file_html: str):
 
 
 if __name__ == "__main__":
+    # show the process for an educational map
     out_filename = 'process_of_map'
     generate_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)

@@ -43,5 +43,6 @@ def generate_map(path_dir: str, file_html: str):
 
 
 if __name__ == "__main__":
+    # New world order as you see it, BRICS, NATO, Global South, Communists, Undecided etc
     out_filename = 'boundaries'
     generate_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)

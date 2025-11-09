@@ -48,5 +48,7 @@ def generate_map(path_dir: str, file_html: str):
 
 
 if __name__ == "__main__":
+    # Elevation or something
+    # Map using raster data. Focus on satellite imagery, elevation models (DEMs), land cover, or pixel-based art.
     out_filename = 'raster'
     generate_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)

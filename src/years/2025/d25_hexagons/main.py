@@ -43,5 +43,8 @@ def generate_map(path_dir: str, file_html: str):
 
 
 if __name__ == "__main__":
+    # Hexagons maps, of city growths?
+    # Challenge Classic: Use hexagonal binning (hexbins) or a hexagonal grid system to visualize your data. 
+    # Celebrate this beautiful and efficient tessellation!       
     out_filename = 'hexagon_map'
     generate_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)

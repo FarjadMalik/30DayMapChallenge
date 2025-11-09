@@ -43,5 +43,7 @@ def generate_map(path_dir: str, file_html: str):
 
 
 if __name__ == "__main__":
+    # (GIS Day) Focus entirely on map projections. 
+    # Choose an unusual or misunderstood projection to highlight a theme, or visualize distortion. (See xkcd.com/977)    
     out_filename = 'projections'
     generate_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)

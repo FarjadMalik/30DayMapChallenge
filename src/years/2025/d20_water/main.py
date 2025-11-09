@@ -43,5 +43,8 @@ def generate_map(path_dir: str, file_html: str):
 
 
 if __name__ == "__main__":
+    # Classical Elements 4/4: Focus on the fluid. 
+    # Map hydrology, oceans, currents, water accessibility, sea level rise, precipitation, or anything aquatic.
+    # PCP can be one. WAPOR tifs                            
     out_filename = 'water'
     generate_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)

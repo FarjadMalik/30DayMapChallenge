@@ -43,5 +43,9 @@ def generate_map(path_dir: str, file_html: str):
 
 
 if __name__ == "__main__":
+    # Pakistan suicide attacks
+    # (Black Friday) Interpret the theme of Black. 
+    # The map can be purely monochromatic, represent absence/darkness (e.g., light pollution), 
+    # or relate to themes of consumption. 
     out_filename = 'black'
     generate_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)

@@ -43,5 +43,6 @@ def generate_map(path_dir: str, file_html: str):
 
 
 if __name__ == "__main__":
+    # remove water and national borders, show map with small communities, maybe a projection?
     out_filename = '2125_map'
     generate_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)

@@ -43,5 +43,6 @@ def generate_map(path_dir: str, file_html: str):
 
 
 if __name__ == "__main__":
+    # forest fires over several years
     out_filename = 'fire'
     generate_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)

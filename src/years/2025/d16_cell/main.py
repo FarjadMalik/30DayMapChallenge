@@ -43,5 +43,6 @@ def generate_map(path_dir: str, file_html: str):
 
 
 if __name__ == "__main__":
+    # Plot mammals species extent over cells
     out_filename = 'cell'
     generate_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)

@@ -43,5 +43,8 @@ def generate_map(path_dir: str, file_html: str):
 
 
 if __name__ == "__main__":
+    # Create a map where icons, pictograms, or custom symbols are the main focus. 
+    # Use them to highlight points of interest or replace traditional cartographic features. 
+    # Place icons for suicide attacks and use bomb icons?
     out_filename = 'iconic'
     generate_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)

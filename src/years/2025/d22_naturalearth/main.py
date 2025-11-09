@@ -43,5 +43,6 @@ def generate_map(path_dir: str, file_html: str):
 
 
 if __name__ == "__main__":
+    # Download some natural earth dataset and play around
     out_filename = 'natural_earth'
     generate_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)

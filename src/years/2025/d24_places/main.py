@@ -43,5 +43,8 @@ def generate_map(path_dir: str, file_html: str):
 
 
 if __name__ == "__main__":
+    # Focus on toponymy (place names). Experiment with font choices, label placement, 
+    # typography, multiple languages, or the history and meaning behind a name. 
+    # Silk route and important way points on it?
     out_filename = 'places'
     generate_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)

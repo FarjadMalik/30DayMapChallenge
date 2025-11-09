@@ -43,5 +43,6 @@ def generate_map(path_dir: str, file_html: str):
 
 
 if __name__ == "__main__":
+    # use pretty maps or a new tool as from JosephBARBIERDARNAL
     out_filename = 'newtool'
     generate_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)
