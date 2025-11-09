@@ -22,12 +22,12 @@ def create_lines_map(path_dir: str, file_html: str):
     logger.info(f"Running {path_dir}")
 
     # Load the shapefile for pakistan admin boundaries
-    shapefile_path = "data/pakistan_admin/gadm41_PAK_3.shp"
+    shapefile_path = "data/pakistan_admin/gadm41_PAK_1.shp"
     admin_gdf = gpd.read_file(shapefile_path)
 
-    # # Ensure the CRS is WGS84 (EPSG:4326) so it works with Folium
-    # if admin_gdf is not None and admin_gdf.crs.to_string() != "EPSG:4326":
-    #     admin_gdf = admin_gdf.to_crs(epsg=4326)
+    # Ensure the CRS is WGS84 (EPSG:4326) so it works with Folium
+    if admin_gdf is not None and admin_gdf.crs.to_string() != "EPSG:4326":
+        admin_gdf = admin_gdf.to_crs(epsg=4326)
 
     # Calculate a center for the map, e.g., the mean of the bounds
     bounds = admin_gdf.total_bounds  # [minx, miny, maxx, maxy]
@@ -36,40 +36,6 @@ def create_lines_map(path_dir: str, file_html: str):
 
     # Create the Folium map, centered on Pakistan (admin boundaries center)
     basemap = folium.Map(location=[center_lat, center_lon], zoom_start=6, tiles='OpenStreetMap')
-
-    # Load hydro/rivers layer from geopackage
-    # gpkg_path = "data/hydrorivers_100.gpkg"
-    # logger.info(f"Hydro gpkg layers: {fiona.listlayers(gpkg_path)}")
-    # hydro_gdf = gpd.read_file(gpkg_path, layer='rivers')
-    # hydro_gdf= gpd.clip(hydro_gdf, admin_gdf)
-
-    # logger.info(f"Hydro gdf len: {len(hydro_gdf)}")
-    # logger.info(f"Hydro gdf crs: {hydro_gdf.crs}")
-    # logger.info(f"Hydro gdf head: {hydro_gdf.head()}")
-
-    # # Add hydro/rivers layer to map
-    # folium.GeoJson(
-    #     hydro_gdf,
-    #     name='Hydro Rivers',
-    #     style_function=lambda feature: {
-    #         'fillColor': 'none',
-    #         'color': 'blue',
-    #         'weight': 1,
-    #     },
-    #     highlight_function=lambda feature: {
-    #         "weight": 3,
-    #         "color": "red"
-    #     },
-    #     tooltip=folium.GeoJsonTooltip(
-    #         fields=hydro_gdf.columns.tolist(),
-    #         aliases=hydro_gdf.columns.tolist(),
-    #         localize=True,   # Format numbers and dates according to locale
-    #         sticky=True,     # Tooltip follows the cursor
-    #         labels=True,     # Show labels in bold
-    #         style=("background-color: white; color: #333; font-size: 12px;")
-    #     )
-    # ).add_to(basemap)
-
 
     # Load rails and roads layer from geopackage
     rail_gpkg_path = "data/PAK_misc/openstreetmap/openstreetmap_rail__PAK.gpkg"

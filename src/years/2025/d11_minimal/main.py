@@ -43,6 +43,7 @@ def generate_map(path_dir: str, file_html: str):
 
 
 if __name__ == "__main__":
-    # Create a map without background and only show world health sites pakistan
+    # Create a map without background and only wri powerplants
+    # data/PAK_misc/wri_powerplants
     out_filename = 'minimal_map'
     generate_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)

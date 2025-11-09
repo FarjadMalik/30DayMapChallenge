@@ -4,6 +4,7 @@ import geopandas as gpd
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
 
+from pathlib import Path
 from rasterio.mask import mask
 from src.utils.logger import get_logger
 from src.utils.helpers import get_relative_path
@@ -124,6 +125,9 @@ def create_dimensions_map(path_dir: str, file_html: str):
         scene=dict(zaxis_title='Density per grid cell')
     )
     fig.show()
+    # Save locally as HTML
+    fig.write_html(f"{Path(path_dir).parent}/{file_html}.html")
+    logger.info(f"Map created – open '{file_html}.html' to view.")
 
 
 if __name__ == "__main__":

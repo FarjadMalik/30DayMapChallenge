@@ -1,7 +1,11 @@
 import folium
 import geopandas as gpd
+import numpy as np
+import rasterio
 
 from pathlib import Path
+from rasterio.plot import reshape_as_image
+
 from src.utils.logger import get_logger
 from src.utils.helpers import get_relative_path
 
@@ -39,6 +43,34 @@ def generate_map(path_dir: str, file_html: str):
     basemap = folium.Map(location=[center_lat, center_lon], zoom_start=10, tiles='OpenStreetMap')
 
     # Add desired data
+    # Load land cover land use layer 
+    lulc_tif_path = "data/PAK_misc/copernicus_lulc/copernicus_lulc__PAK.tif"
+    with rasterio.open(lulc_tif_path) as src:
+        bounds = src.bounds
+        img = src.read()
+        crs = src.crs
+    
+    # logger.info(f"LULC Raster CRS: {crs}")
+    # logger.info(f"LULC bounds: {bounds}")
+    # logger.info(f"LULC img shape: {img.shape}")
+    
+    # Reshape the image for proper display (bands, rows, cols) -> (rows, cols, bands)
+    img = reshape_as_image(img)
+    logger.info(f"LULC reshaped img shape: {img.shape}")
+
+    # Normalize image values to 0–1 for display
+    img = img.astype(float)
+    img = (img - np.nanmin(img)) / (np.nanmax(img) - np.nanmin(img))
+
+    # Add LULC raster as an image overlay
+    folium.raster_layers.ImageOverlay(
+        image=img,
+        bounds=[[bounds.bottom, bounds.left], [bounds.top, bounds.right]],
+        opacity=0.6,
+        name='Copernicus LULC Overlay',
+        interactive=True,
+        cross_origin=False,
+    ).add_to(basemap)
 
     # Allows toggling between layers interactively 
     folium.LayerControl().add_to(basemap)

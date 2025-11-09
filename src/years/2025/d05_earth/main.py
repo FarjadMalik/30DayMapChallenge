@@ -22,7 +22,7 @@ def create_earth_map(path_dir: str, file_html: str):
     # Geodatabase path
     gdb_path = "data/PAK_misc/FL20250818PAK.gdb"
     flood_layerlist = fiona.listlayers(gdb_path)
-    # logger.info(f"Layers in GDB: {flood_layerlist}")
+    logger.info(f"Layers in GDB: {flood_layerlist}")
 
     # Load the flood extent polygon layer
     flood_gdf = gpd.read_file(gdb_path, layer='VIIRS_20250826_20250907_FloodWaterExtent_PAK')
@@ -68,25 +68,6 @@ def create_earth_map(path_dir: str, file_html: str):
          <h3 align="center" style="font-size:20px"><b>Floods Pakistan 2025</b></h3>
          """
     basemap.get_root().html.add_child(folium.Element(title_html))
-
-    # # Add Legend - Build HTML string
-    # items = "".join(
-    #     f"<i style='background:{colour};width:18px;height:18px;display:inline-block;margin-right:8px;'></i>{label}<br>"
-    #     for label, colour in legend_dict.items()
-    # )
-    # html = f"""
-    # <div style="position: fixed; { 'bottom: 50px;' if position.endswith('right') else '' } 
-    #              { 'right: 50px;' if position.endswith('right') else 'left:50px;' } 
-    #              width: 200px; height: auto; 
-    #              border:2px solid grey; z-index:9999; font-size:14px;
-    #              background-color:white; opacity:0.85; padding: 10px;">
-    #   <b>{title}</b><br>
-    #   {items}
-    # </div>
-    # """
-    # legend = branca.element.MacroElement()
-    # legend._template = branca.element.Template(html)
-    # map_obj.get_root().add_child(legend)
 
     # Allows toggling between layers interactively 
     folium.LayerControl().add_to(basemap)
