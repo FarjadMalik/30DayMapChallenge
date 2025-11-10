@@ -4,14 +4,10 @@ import imageio
 import rasterio
 import numpy as np
 import geopandas as gpd
-import contextily as ctx
-import matplotlib.pyplot as plt
 
 from PIL import Image
 from pathlib import Path
-from folium import raster_layers
 from rasterio.plot import reshape_as_image
-from branca.element import Template, MacroElement
 
 from src.utils.logger import get_logger
 from src.utils.helpers import get_relative_path
