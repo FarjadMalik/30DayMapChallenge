@@ -44,5 +44,7 @@ def generate_map(path_dir: str, file_html: str):
 
 if __name__ == "__main__":
     # forest fires over several years
+    # https://data.cci.ceda.ac.uk/thredds/dodsC/esacci.FIRE.mon.L4.BA.multi-sensor.multi-platform.SYN.v1-1.grid.html
+    # https://climate.esa.int/search?ecv=FIRE
     out_filename = 'fire'
     generate_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)

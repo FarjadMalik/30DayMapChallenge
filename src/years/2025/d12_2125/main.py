@@ -20,90 +20,94 @@ def generate_map(path_dir: str, file_html: str):
     
     """
     logger.info(f"Hello from {path_dir}")
+   
+    dem_path = "data/output_hh.tif"
+    with rasterio.open(dem_path) as src:
+        dem = src.read(1)
+        meta = src.meta.copy()
+        img_bounds = src.bounds
+    nodata = meta.get("nodata", None)
     
-    # Load the shapefile for pakistan admin boundaries
-    shapefile_path = "data/pakistan_admin/gadm41_PAK_3.shp"
-    admin_gdf = gpd.read_file(shapefile_path)
+    world = gpd.read_file("data/countries.geojson")
+    # world = world.to_crs(proj.proj4_init)
+    world = world[world["name"].isin(["Sri Lanka"])]
 
     # Ensure the CRS is WGS84 (EPSG:4326) so it works with Folium
-    if admin_gdf is not None and admin_gdf.crs.to_string() != "EPSG:4326":
-        admin_gdf = admin_gdf.to_crs(epsg=4326)
+    if world is not None and world.crs.to_string() != "EPSG:4326":
+        world = world.to_crs(epsg=4326)
 
     # Calculate a center for the map, e.g., the mean of the bounds
-    bounds = admin_gdf.total_bounds  # [minx, miny, maxx, maxy]
+    bounds = world.total_bounds  # [minx, miny, maxx, maxy] 
     center_lat = (bounds[1] + bounds[3]) / 2
     center_lon = (bounds[0] + bounds[2]) / 2
     logger.info(f"Center Lat Lon: {center_lat, center_lon}")
     
-    # Create and Center a base map
-    basemap = folium.Map(location=[center_lat, center_lon], zoom_start=10, tiles='OpenStreetMap')
-
-    # Add desired data
-
-    # Allows toggling between layers interactively 
-    folium.LayerControl().add_to(basemap)
-    # Save the map to an HTML file
-    basemap.save(f"{Path(path_dir).parent}/{file_html}.html")
-    logger.info(f"Map created – open '{file_html}.html' to view.")
-
-def load_dem(path):
-    with rasterio.open(path) as src:
-        dem = src.read(1)
-        meta = src.meta.copy()
-    return dem, meta
-
-def compute_inundation_mask(dem, sea_rise, nodata=None):
-    mask = dem <= sea_rise
+    # Sea Level Rise scenarios in meters
+    # sea_rise_scenarios = [0.5, 1.0, 2.0] 
+    sr = 2.0 # which is the average model speculation
+    logger.debug(f"Simulating sea level rise = {sr} m")
+    
+    # Mask dem values below our sea level speculation
+    # DEM values are already in meters
+    mask = (dem > 0.0) & (dem <= sr)
     if nodata is not None:
         mask = np.where(dem == nodata, False, mask)
-    return mask
+    # Calculate how much of the island will be under water
+    frac = np.count_nonzero(mask) / np.count_nonzero(dem)
+    logger.debug(f" -> Fraction inundated: {frac:.2%}")
+    
+    # save raster
+    out_meta = meta.copy()
+    out_meta.update({"dtype": "uint8", "count": 1})
+    out_path = Path(path_dir).parent / f"srilanka_inundation_{sr:.1f}m.tif"
+    with rasterio.open(out_path, "w", **out_meta) as dst:
+        dst.write(mask.astype(np.uint8), 1)
 
-def mask_to_vector(mask, meta, transform, min_area=1000):
-    # convert mask to polygons (optionally filter small areas)
-    shapes = features.shapes(mask.astype(np.uint8), transform=transform)
-    geoms = []
-    vals = []
-    for geom, val in shapes:
-        if val == 1:
-            geoms.append(geom)
-            vals.append(val)
-    gdf = gpd.GeoDataFrame({"value": vals}, geometry=geoms, crs=meta["crs"])
-    # filter by area if needed
-    if min_area:
-        gdf["area"] = gdf.geometry.area
-        gdf = gdf[gdf["area"] >= min_area]
-    return gdf
+    fig, ax = plt.subplots(figsize=(8,6))
+    
+    # Plot the polygon layer first, boundary only if needed
+    # world.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=1.0)
 
-def main(dem_path, sea_rise_list):
-    dem, meta = load_dem(dem_path)
-    nodata = meta.get("nodata", None)
-    for sr in sea_rise_list:
-        print(f"Simulating sea level rise = {sr} m")
-        mask = compute_inundation_mask(dem, sr, nodata=nodata)
-        frac = np.count_nonzero(mask) / mask.size
-        print(f" -> Fraction inundated: {frac:.2%}")
-        # save raster
-        out_meta = meta.copy()
-        out_meta.update({"dtype": "uint8", "count": 1})
-        out_path = f"inundation_{sr:.1f}m.tif"
-        with rasterio.open(out_path, "w", **out_meta) as dst:
-            dst.write(mask.astype(np.uint8), 1)
-        # optionally vectorise
-        # gdf = mask_to_vector(mask, meta, transform=meta["transform"])
-        # gdf.to_file(f"inundation_{sr:.1f}m.geojson", driver="GeoJSON")
-        # plot
-        plt.figure(figsize=(8,6))
-        plt.imshow(mask, cmap="Blues")
-        plt.title(f"Inundation map at {sr:.1f} m rise")
-        plt.colorbar(label="Inundated (1=yes)")
-        plt.show()
+    # Plot the mask raster on top  
+    # We need to consider the spatial extent if this is georeferenced.
+    # If mask is aligned in pixel coordinates only, you may not specify extent.
+    im = ax.imshow(mask,
+                cmap="Blues",
+                alpha=0.7,
+                extent=(img_bounds[0], img_bounds[2], img_bounds[1], img_bounds[3]), # [left, right, bottom, top],  # uncomment if you know the spatial bounds
+                origin='upper')   # adjust origin if needed
+
+    # Title & colorbar
+    ax.set_title(f"Sea Level Inundation at {sr:.1f} m rise Sri Lanka")
+    cbar = fig.colorbar(im, ax=ax, orientation='vertical', label="Inundated (1=yes)")
+
+    # Axis labels, aspect
+    ax.set_xlabel("Longitude / Easting")
+    ax.set_ylabel("Latitude / Northing")
+    ax.set_aspect('equal')  # so map scales properly for geographic display 
+    # ax.set_axis_off()   
+    
+    # Add text at bottom‑left
+    ax.text(
+        -0.6,            # x‑coordinate in axes fraction (just inside left)
+        0.9,            # y‑coordinate in axes fraction (just inside bottom)
+        f"{frac:.2%} of Sri Lanka \nwill be under water\nby 2125", 
+        transform=ax.transAxes,         # use axes coordinate system (0,0 = bottom left, 1,1 = top right)
+        ha='left',                      # horizontal alignment of text box (“left” means text start at x position)
+        va='bottom',                    # vertical alignment (“bottom” means the bottom of text is at y position)
+        fontsize=10,
+        color='black',                  # or whatever colour suits
+        bbox=dict(facecolor='red', alpha=0.5)  # background box to make it stand out
+    )
+    
+    # Save as image
+    output_path = Path(path_dir).parent / f"{file_html}.png"
+    # plt.tight_layout()
+    plt.savefig(output_path, dpi=300)
+    plt.close(fig)
 
 
 if __name__ == "__main__":
     # remove water and national borders, show map with small communities, maybe a projection?
-    out_filename = '2125_map'
-    generate_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)    
-    dem_path = "your_dem_srilanka.tif"
-    # choose scenarios
-    sea_rise_scenarios = [0.5, 1.0, 2.0]
-    main(dem_path, sea_rise_scenarios)
+    out_filename = 'SeaLevelRise_2125'
+    generate_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)
