@@ -1,7 +1,11 @@
-import folium
 import geopandas as gpd
+import cartopy.crs as ccrs
+import matplotlib.pyplot as plt
 
 from pathlib import Path
+from pypalettes import load_cmap
+from pyfonts import load_font
+
 from src.utils.logger import get_logger
 from src.utils.helpers import get_relative_path
 
@@ -15,33 +19,113 @@ def generate_map(path_dir: str, file_html: str):
     
     """
     logger.info(f"Hello from {path_dir}")
+    # Create a Mercator project
+    proj = ccrs.Mercator()
     
-    # Load the shapefile for pakistan admin boundaries
-    shapefile_path = "data/pakistan_admin/gadm41_PAK_3.shp"
-    admin_gdf = gpd.read_file(shapefile_path)
+    # Load the shapefile for world admin boundaries
+    world_gdf = gpd.read_file("data/countries.geojson")
+    world_gdf = world_gdf.to_crs(proj.proj4_init)
+    world_gdf = world_gdf[~world_gdf["name"].isin(["Antarctica"])]
 
-    # Ensure the CRS is WGS84 (EPSG:4326) so it works with Folium
-    if admin_gdf is not None and admin_gdf.crs.to_string() != "EPSG:4326":
-        admin_gdf = admin_gdf.to_crs(epsg=4326)
+    # Add countries i have been to
+    world_gdf["visited"] = world_gdf["name"].apply(
+        lambda x: (
+            0 if x in ["Belgium", "Pakistan"]
+            else 
+                1 if x in ["Italy", "Spain", "Germany", "United Kingdom", 
+                            "Netherlands", "Austria", "India", "France"] 
+                else 2  
+        )
+    )
 
-    # Calculate a center for the map, e.g., the mean of the bounds
-    bounds = admin_gdf.total_bounds  # [minx, miny, maxx, maxy]
-    center_lat = (bounds[1] + bounds[3]) / 2
-    center_lon = (bounds[0] + bounds[2]) / 2
-    logger.info(f"Center Lat Lon: {center_lat, center_lon}")
+    # Load plot beautifications
+    font = load_font(
+        "https://github.com/BornaIz/markazitext/blob/master/fonts/ttf/MarkaziText-Regular.ttf?raw=true"
+    )
+    cmap = load_cmap("Acadia", keep=[False, False, True, False, True, True])
+    background_color = "#fffdf3"
+
+    # Create figure
+    fig, ax = plt.subplots(figsize=(12, 6), subplot_kw={"projection": proj})
+    fig.set_facecolor(background_color)
+    ax.axis("off")
+
+    # Plot world
+    world_gdf.plot(ax=ax, column="visited", edgecolor="black", lw=0.2, cmap=cmap)
+
+    fig.text(
+        x=0.5,
+        y=1.05,
+        s="An uncompleted list of",
+        size=20,
+        ha="center",
+        va="top",
+        font=font,
+        color="#cfcdcd",
+    )
     
-    # Create and Center a base map
-    basemap = folium.Map(location=[center_lat, center_lon], zoom_start=10, tiles='OpenStreetMap')
+    fig.text(
+        x=0.5,
+        y=1.01,
+        s="Countries visited",
+        size=30,
+        ha="center",
+        va="top",
+        font=font,
+    )
 
-    # Add desired data
+    fig.text(x=0.25, y=0.2, s="National\n\nVisited\n\nBucket List?", ha="left", font=font, size=12)
 
-    # Allows toggling between layers interactively 
-    folium.LayerControl().add_to(basemap)
-    # Save the map to an HTML file
-    basemap.save(f"{Path(path_dir).parent}/{file_html}.html")
-    logger.info(f"Map created – open '{file_html}.html' to view.")
+    ax.add_patch(
+        plt.Rectangle(
+            (0.11, 0.274),
+            0.02,
+            0.025,
+            facecolor=cmap.colors[0],
+            lw=0.5,
+            edgecolor="black",
+            transform=ax.transAxes,
+        )
+    )
+    ax.add_patch(
+        plt.Rectangle(
+            (0.11, 0.227),
+            0.02,
+            0.025,
+            facecolor=cmap.colors[1],
+            lw=0.5,
+            edgecolor="black",
+            transform=ax.transAxes,
+        )
+    )
+    ax.add_patch(
+        plt.Rectangle(
+            (0.11, 0.18),
+            0.02,
+            0.025,
+            facecolor=cmap.colors[2],
+            lw=0.5,
+            edgecolor="black",
+            transform=ax.transAxes,
+        )
+    )
 
+    fig.text(
+        x=0.75,
+        y=0.1,
+        s="#30DayMapChallenge",
+        font=font,
+        ha="right",
+        size=8,
+    )
+
+    
+    plt.tight_layout()
+    # Save as image
+    output_path = Path(path_dir).parent / f"{file_html}.png"
+    plt.savefig(output_path, dpi=500, bbox_inches="tight")
 
 if __name__ == "__main__":
+    # --- Plot countries you have been (use fonts and custom legend)---
     out_filename = '10min_map'
     generate_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)
