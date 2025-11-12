@@ -22,5 +22,6 @@ data
 # temporary files
 src\notebooks\Folium_refresher.ipynb
 
-# HTML files
+# huge files: HTML and tif 
 *.html
+*.tif

@@ -25,12 +25,12 @@ def generate_map(path_dir: str, file_html: str):
         admin_gdf = admin_gdf.to_crs(epsg=4326)
 
     # Load Osm data
-    # poi_gdf = gpd.read_file("data/hotosm/hotosm_pak_points_of_interest_points_shp.shp")
-    # amenity_list = ['college', 'university', 'prep_school', 'research_institute', 'school', 'kindergarten']
-    # aoi_df = poi_gdf.loc[poi_gdf['amenity'].isin(amenity_list), []]
+    poi_gdf = gpd.read_file("data/hotosm/hotosm_pak_points_of_interest_points_shp.shp")
+    amenity_list = ['college', 'university', 'prep_school', 'research_institute', 'school', 'kindergarten']
+    aoi_df = poi_gdf.loc[poi_gdf['amenity'].isin(amenity_list), []]
 
-    # if aoi_df.crs != admin_gdf.crs:
-    #     aoi_df.to_crs(admin_gdf.crs.to_string() , inplace=True)
+    if aoi_df.crs != admin_gdf.crs:
+        aoi_df.to_crs(admin_gdf.crs.to_string() , inplace=True)
     
     # Calculate a center for the map, e.g., the mean of the bounds
     bounds = admin_gdf.total_bounds  # [minx, miny, maxx, maxy]
