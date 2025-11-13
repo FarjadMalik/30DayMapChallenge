@@ -49,5 +49,6 @@ def generate_map(path_dir: str, file_html: str):
 
 if __name__ == "__main__":
     # meteor showers over earth
+    # https://medium.com/@awstechguide/meteorite-landings-visualization-8e01c76ebdba
     out_filename = 'outofthisworld'
     generate_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)
