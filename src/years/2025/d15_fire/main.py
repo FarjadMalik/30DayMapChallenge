@@ -1,8 +1,14 @@
+import os
+import imageio
 import pandas as pd
 import geopandas as gpd
-from shapely import make_valid
+import matplotlib.pyplot as plt
+import cartopy.crs as ccrs
 
 from pathlib import Path
+from io import BytesIO
+from shapely import make_valid
+
 from src.utils.logger import get_logger
 from src.utils.helpers import get_relative_path
 
@@ -46,48 +52,70 @@ def generate_map(path_dir: str, file_out: str):
     if not shp_file.exists():
         explore_and_repivot_dataset(str(shp_file))
     
+    # Read wildfires dataset (per year for countries)
     effis_gdf = gpd.read_file(shp_file)
-    # logger.debug(f"effis gdf head - {effis_gdf.head()}")
-    # logger.debug(f"effis gdf len - {len(effis_gdf)}")
-    # logger.debug(f"effis gdf columns - {effis_gdf.columns}")
-
+    # Merge with country codes to get actual country name
     countrycodes = pd.read_csv("data/country-codes-list.csv")
-    # logger.debug(f"countrycodes head - {countrycodes.head()}")
-    # logger.debug(f"countrycodes len - {len(countrycodes)}")
-    # logger.debug(f"countrycodes columns - {countrycodes.columns}")
-
     effis_gdf = effis_gdf.merge(countrycodes, how="left", left_on="COUNTRY", right_on="Code")
+    # Remove extra column
     effis_gdf.drop(columns=['COUNTRY'], inplace=True)
-    # logger.debug(f"effis gdf head - {effis_gdf.head()}")
-    # logger.debug(f"effis gdf len - {len(effis_gdf)}")
-    # logger.debug(f"effis gdf columns - {effis_gdf.columns}")
-    # logger.debug(f"effis gdf Name count - {effis_gdf[['YEAR', 'Name']].groupby('Name').count()}")
+    
+    # Plot basics
+    # proj = ccrs.Gnomonic()
+    proj = ccrs.EckertI()
+    # proj = ccrs.InterruptedGoodeHomolosine()
+    background_color = "#fffdf3"
+    
+    # set correct projection for the dataset, to be used with ccrs
+    effis_gdf = effis_gdf.to_crs(proj.proj4_init)
+    # Read world boundaries
+    world = gpd.read_file("data/countries.geojson")
+    world = world.to_crs(proj.proj4_init)
+    # only keep eu countries, countries with fires
+    world = world.loc[world["name"].isin(effis_gdf["Name"].unique())]
+
+    # if needed to store each image locally in a cache dir
+    # out_dir = f"{Path(path_dir).parent}/.cache"
+    # os.makedirs(out_dir, exist_ok=True)
+
+    # get range of years in the dataset
     min_year = effis_gdf["YEAR"].min()
     max_year = effis_gdf["YEAR"].max()
     logger.debug(f"effis gdf min max - {min_year, max_year}")
+    
+    # For each year map the wild fires
+    frames = []
     for y in range(min_year, max_year+1):
         logger.debug(y)
+        # filter out the desired year
         effis_y_gdf = effis_gdf.loc[effis_gdf['YEAR']==y]
-        logger.debug(f"effis gdf len - {len(effis_y_gdf)}")
-        logger.debug(f"effis country count - {effis_y_gdf.groupby('Name').count()}")
+        
+        # plot
+        fig, ax = plt.subplots(figsize=(12, 6), subplot_kw={"projection": proj})
+        fig.set_facecolor(background_color)
+        # add world (EU) and our fire shapefile for that year
+        world.plot(ax=ax, color="lightgrey", edgecolor="black", lw=0.2)
+        effis_y_gdf.plot(ax=ax, color="red", edgecolor="red", lw=0.4)
+        # grid lines and title
+        ax.gridlines(draw_labels=True, color="grey", linestyle="--", lw=0.5)
+        ax.set_title(f"WILDFIRES EU - {y}", fontsize=14)
+        
+        # Save figure in list
+        buf = BytesIO()
+        plt.savefig(buf, format='png', bbox_inches='tight', dpi=500)
+        plt.close(fig)
+        buf.seek(0)
+        frames.append(imageio.v2.imread(buf))
+        buf.close()
 
+        # Store images locally if wanted
+        # plt.tight_layout()
+        # plt.savefig(f"{out_dir}/{file_out}_{y}.png", dpi=500, bbox_inches="tight")
 
-    # Calculate a center for the map, e.g., the mean of the bounds
-    bounds = effis_gdf.total_bounds  # [minx, miny, maxx, maxy]
-    center_lat = (bounds[1] + bounds[3]) / 2
-    center_lon = (bounds[0] + bounds[2]) / 2
-    logger.info(f"Center Lat Lon: {center_lat, center_lon}")
-    
-    # # Create and Center a base map
-    # basemap = folium.Map(location=[center_lat, center_lon], zoom_start=10, tiles='OpenStreetMap')
-
-    # # Add desired data
-
-    # # Allows toggling between layers interactively 
-    # folium.LayerControl().add_to(basemap)
-    # # Save the map to an HTML file
-    # basemap.save(f"{Path(path_dir).parent}/{file_out}.html")
-    # logger.info(f"Map created – open '{file_out}.html' to view.")
+    # Create an animation with the images from each year
+    gif_name = os.path.join(f"{Path(path_dir).parent}", f"Yearly_wildfires_EU_timeseries.gif")
+    imageio.mimsave(gif_name, frames, duration=2.0)
+    logger.info(f"Map created – open '{gif_name}' to view.")
 
 
 if __name__ == "__main__":
