@@ -42,63 +42,38 @@ def explore_and_repivot_dataset(out_shp: str):
                                        ).reset_index()
     effis_gdf.to_file(out_shp)
 
-def generate_map(path_dir: str, file_out: str):
+def create_animation(admin, dataset, column_to_use, output_path):
     """
-    Creates polygon map for Day 3 exercises
-    
     """
-    logger.info(f"Generating {path_dir}")
-    shp_file = Path("data/effis_layer/effis_pc_by_year.shp")
-    if not shp_file.exists():
-        explore_and_repivot_dataset(str(shp_file))
-    
-    # Read wildfires dataset (per year for countries)
-    effis_gdf = gpd.read_file(shp_file)
-    # Merge with country codes to get actual country name
-    countrycodes = pd.read_csv("data/country-codes-list.csv")
-    effis_gdf = effis_gdf.merge(countrycodes, how="left", left_on="COUNTRY", right_on="Code")
-    # Remove extra column
-    effis_gdf.drop(columns=['COUNTRY'], inplace=True)
-    
-    # Plot basics
+    # Plot basics, initialize a cartopy projection and set neutral background
     # proj = ccrs.Gnomonic()
     proj = ccrs.EckertI()
     # proj = ccrs.InterruptedGoodeHomolosine()
     background_color = "#fffdf3"
     
     # set correct projection for the dataset, to be used with ccrs
-    effis_gdf = effis_gdf.to_crs(proj.proj4_init)
-    # Read world boundaries
-    world = gpd.read_file("data/countries.geojson")
-    world = world.to_crs(proj.proj4_init)
-    # only keep eu countries, countries with fires
-    world = world.loc[world["name"].isin(effis_gdf["Name"].unique())]
-
-    # if needed to store each image locally in a cache dir
-    # out_dir = f"{Path(path_dir).parent}/.cache"
-    # os.makedirs(out_dir, exist_ok=True)
-
+    admin = admin.to_crs(proj.proj4_init)
+    dataset = dataset.to_crs(proj.proj4_init)
+    
     # get range of years in the dataset
-    min_year = effis_gdf["YEAR"].min()
-    max_year = effis_gdf["YEAR"].max()
-    logger.debug(f"effis gdf min max - {min_year, max_year}")
+    min_value = dataset[column_to_use].min()
+    max_value = dataset[column_to_use].max()
     
     # For each year map the wild fires
     frames = []
-    for y in range(min_year, max_year+1):
-        logger.debug(y)
-        # filter out the desired year
-        effis_y_gdf = effis_gdf.loc[effis_gdf['YEAR']==y]
+    for v in range(min_value, max_value+1):
+        # filter out the desired data
+        subset = dataset.loc[dataset[column_to_use]==v]
         
-        # plot
+        # plot for the given series
         fig, ax = plt.subplots(figsize=(12, 6), subplot_kw={"projection": proj})
         fig.set_facecolor(background_color)
-        # add world (EU) and our fire shapefile for that year
-        world.plot(ax=ax, color="lightgrey", edgecolor="black", lw=0.2)
-        effis_y_gdf.plot(ax=ax, color="red", edgecolor="red", lw=0.4)
+        # add admin as in (in our case EU) and our fire shapefile for that particular subset (year)
+        admin.plot(ax=ax, color="lightgrey", edgecolor="black", lw=0.2)
+        subset.plot(ax=ax, color="red", edgecolor="red", lw=0.4)
         # grid lines and title
         ax.gridlines(draw_labels=True, color="grey", linestyle="--", lw=0.5)
-        ax.set_title(f"WILDFIRES EU - {y}", fontsize=14)
+        ax.set_title(f"WILDFIRES EU - {v}", fontsize=14)
         
         # Save figure in list
         buf = BytesIO()
@@ -109,16 +84,43 @@ def generate_map(path_dir: str, file_out: str):
         buf.close()
 
         # Store images locally if wanted
-        # plt.tight_layout()
         # plt.savefig(f"{out_dir}/{file_out}_{y}.png", dpi=500, bbox_inches="tight")
 
     # Create an animation with the images from each year
-    gif_name = os.path.join(f"{Path(path_dir).parent}", f"Yearly_wildfires_EU_timeseries.gif")
-    imageio.mimsave(gif_name, frames, duration=2.0)
-    logger.info(f"Map created – open '{gif_name}' to view.")
+    imageio.mimsave(f"{output_path}.gif", frames, duration=2.0)
+    
+def generate_map(path_dir: str, filename: str):
+    """    
+    """
+    logger.info(f"Generating {path_dir}")
+
+    # Read wildfires dataset
+    shp_file = Path("data/effis_layer/effis_pc_by_year.shp")
+    if not shp_file.exists():
+        explore_and_repivot_dataset(str(shp_file))
+    
+    # Read wildfires dataset (per year for countries)
+    effis_gdf = gpd.read_file(shp_file)
+
+    # Merge with country codes to get actual country name
+    countrycodes = pd.read_csv("data/country-codes-list.csv")
+    effis_gdf = effis_gdf.merge(countrycodes, how="left", left_on="COUNTRY", right_on="Code")
+    # Remove extra column
+    effis_gdf.drop(columns=['COUNTRY'], inplace=True)
+
+    # Read world boundaries
+    world = gpd.read_file("data/countries.geojson")
+    # only keep eu countries, countries with fires
+    world = world.loc[world["name"].isin(effis_gdf["Name"].unique())]
+    
+    # Create and save animation   
+    output_path = os.path.join(f"{Path(path_dir).parent}", f"{filename}")
+    create_animation(admin=world, dataset=effis_gdf, column_to_use='YEAR', output_path=output_path)
+
+    logger.info(f"Map created – open '{output_path}' to view.")
 
 
 if __name__ == "__main__":
     # forest fires over several years in europe
-    out_filename = 'wildfires_eu'
-    generate_map(path_dir=str(get_relative_path(__file__)), file_out=out_filename)
+    filename = 'Wildfires_EU_timeseries'
+    generate_map(path_dir=str(get_relative_path(__file__)), filename=filename)

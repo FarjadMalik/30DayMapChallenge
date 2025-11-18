@@ -11,7 +11,7 @@ from src.utils.helpers import get_relative_path
 logger = get_logger(__name__)
 
 
-def generate_map(path_dir: str, file_out: str):
+def generate_map(path_dir: str, filename: str):
     """
     Creates polygon map for Day 3 exercises
     
@@ -37,10 +37,10 @@ def generate_map(path_dir: str, file_out: str):
     p.save_graphic(f"{output_path}.svg")
     p.export_html(f"{output_path}.html")
     
-    logger.info(f"Map created – open '{file_out}.png' to view.")
+    logger.info(f"Map created – open '{filename}' to view.")
 
 
 if __name__ == "__main__":
     # use pretty maps or a new tool pyvista, TODO: see and load other example data for this
-    out_filename = 'newtool'
-    generate_map(path_dir=str(get_relative_path(__file__)), file_out=out_filename)
+    filename = 'newtool'
+    generate_map(path_dir=str(get_relative_path(__file__)), filename=filename)

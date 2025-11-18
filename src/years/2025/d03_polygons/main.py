@@ -16,15 +16,38 @@ from src.utils.helpers import get_relative_path
 logger = get_logger(__name__)
 
 
-def create_folium_map(dataset, output_path):
-    
+def create_folium_map(admin, dataset, output_path):
+    """
+    """
+    # Ensure the CRS is WGS84 (EPSG:4326) so it works with Folium
+    if admin is not None and admin.crs.to_string() != "EPSG:4326":
+        admin = admin.to_crs(epsg=4326)
+    if admin.crs != dataset.crs:
+        dataset = dataset.to_crs(admin.crs)
+        
     # Calculate a center for the map, e.g., the mean of the bounds
-    bounds = dataset.total_bounds  # [minx, miny, maxx, maxy]
+    bounds = admin.total_bounds  # [minx, miny, maxx, maxy]
     center_lat = (bounds[1] + bounds[3]) / 2
     center_lon = (bounds[0] + bounds[2]) / 2
 
     # Create the Folium map, centered on Pakistan (admin boundaries center)
-    basemap = folium.Map(location=[center_lat, center_lon], zoom_start=6, tiles='OpenStreetMap')
+    basemap = folium.Map(location=[center_lat, center_lon], zoom_start=5, tiles='OpenStreetMap')
+    
+    # Add the administrative boundaries layer
+    folium.GeoJson(
+        admin,
+        name='Administrative Boundaries',
+        style_function=lambda feature: {
+            'fillColor': None,
+            'color': 'black',
+            'weight': 1,
+            'opacity': 0.5
+        },
+        tooltip=folium.GeoJsonTooltip(
+            fields=['NAME_1'], 
+            aliases=['Province:']
+        )
+    ).add_to(basemap)
 
     # Add IPC polygons to the map
     folium.GeoJson(
@@ -48,7 +71,7 @@ def create_folium_map(dataset, output_path):
     # Add legend for phases/colors
     title_html = '''
     <h3 align="center" style="font-size:20px; font-weight:bold; margin-top:10px">
-        IPC Acute Food Insecurity Levels - Pakistan
+        IPC Acute Food Insecurity Levels - Pakistan 2025
     </h3>
     '''
     basemap.get_root().html.add_child(folium.Element(title_html))
@@ -81,27 +104,34 @@ def create_folium_map(dataset, output_path):
     </div>
     {% endmacro %}
     """
-
+    # Add legend to your map
     legend = MacroElement()
     legend._template = Template(legend_html)
-
-    # Add legend to your map
     basemap.get_root().add_child(legend)
 
     # Allows toggling between layers interactively 
     folium.LayerControl().add_to(basemap)
     # Save the map to an HTML file
-    basemap.save(output_path)    
+    basemap.save(output_path)
 
-def create_png_map(dataset, output_path):
-    
+def create_png_map(admin, dataset, output_path):
+    """
+    """
     # Calculate a center for the map, e.g., the mean of the bounds
-    bounds = dataset.total_bounds  # [minx, miny, maxx, maxy]
+    bounds = admin.total_bounds  # [minx, miny, maxx, maxy]
     center_lat = (bounds[1] + bounds[3]) / 2
     center_lon = (bounds[0] + bounds[2]) / 2
 
     # create fig and axis
-    fig, ax = plt.subplots(figsize=(12, 10))
+    _, ax = plt.subplots(figsize=(12, 10))
+
+    # plot admin boundaries
+    admin.plot(
+        ax=ax,
+        color='white',
+        edgecolor='black',
+        linewidth=1
+    )
     
     # plot polygons with colors
     dataset.plot(
@@ -111,41 +141,51 @@ def create_png_map(dataset, output_path):
         linewidth=1,
         alpha=0.7
     )
-    lat_range = 6
-    lon_range =6
-    ax.set_xlim(center_lon - lon_range, center_lon + lon_range)
-    ax.set_ylim(center_lat - lat_range, center_lat + lat_range)
+    ax.set_xlim(center_lon - 9, center_lon + 9)
+    ax.set_ylim(center_lat - 9, center_lat + 9)
 
     # Add title & legend
     ax.set_title(
-        "IPC Acute Food Insecurity Levels - Pakistan",
+        "IPC Acute Food Insecurity Levels - Pakistan 2025",
         fontsize=18,
         fontweight="bold",
         pad=20
     )
 
+    # Define your color mapping for phases (for legend use, takes care of missing phases in the dataset)
+    phase_color_dict = {
+        1: '#fae61e', # Level 1
+        2: '#e67800', # Level 2
+        3: '#c80000', # Level 3
+        4: '#640000', # Level 4
+        5: '#000000', # Level 5
+    }
     legend_elements = []
-    for phase, color in dataset[['overall_phase', 'color']].drop_duplicates().values:
+    for phase, color in phase_color_dict.items():
         legend_elements.append(Patch(facecolor=color, edgecolor=color,
                                      label=f"Level {phase}"))
+    
+    # Beautify, add legend and save
     ax.legend(
         handles=legend_elements,
-        title="IPC Food Phases",
+        title="Food Insecurity Level",
         loc="lower left",
         frameon=True
     )
-
-    # Beautify and save
     ax.set_axis_off()
     plt.tight_layout()
     plt.savefig(output_path, dpi=500, bbox_inches="tight")
 
-def generate_polygon_map(path_dir: str, file_out: str):
+def generate_polygon_map(path_dir: str, filename: str):
     """
-    Creates polygon map for Day 3 exercises
-    
+    Creates polygon map for Day 3 exercises    
     """
-    logger.info(f"Hello from {path_dir}")
+    logger.info(f"Generating {path_dir}")
+
+    # Load the shapefile for pakistan admin boundaries
+    shapefile_path = "data/pakistan_admin/gadm41_PAK_1.shp"
+    admin_gdf = gpd.read_file(shapefile_path)
+    admin_gdf = admin_gdf[['COUNTRY', 'NAME_1', 'geometry']]
     
     # Load IPC Acute Food Insecurity layer dataset
     file_ipc_food_insecurity = "data/PAK_misc/AcuteFoodInsecurity_ipc_pak_area_long_latest.csv"
@@ -180,13 +220,13 @@ def generate_polygon_map(path_dir: str, file_out: str):
     del ipc_gdf, ipc_df
     
     # Create different types of maps
-    output_path = f"{Path(path_dir).parent}/{file_out}"
-    create_folium_map(ipc_pak_gdf, f"{output_path}.html")
-    # create_png_map(ipc_pak_gdf, f"{output_path}.png")
+    output_path = f"{Path(path_dir).parent}/{filename}"
+    create_folium_map(admin_gdf, ipc_pak_gdf, f"{output_path}.html")
+    create_png_map(admin_gdf, ipc_pak_gdf, f"{output_path}.png")
     
-    logger.info(f"Map created – open '{file_out}' to view.")
+    logger.info(f"Map created – open '{filename}' to view.")
 
 
 if __name__ == "__main__":
-    out_filename = 'AcuteFoodInsecurity_pakistan'
-    generate_polygon_map(path_dir=str(get_relative_path(__file__)), file_out=out_filename)
+    filename = 'AcuteFoodInsecurity_pakistan'
+    generate_polygon_map(path_dir=str(get_relative_path(__file__)), filename=filename)

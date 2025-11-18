@@ -9,7 +9,6 @@ import branca.colormap as cm
 import matplotlib.colors as mcolors
 
 from io import BytesIO
-from datetime import datetime
 from folium import plugins
 from pathlib import Path
 from src.utils.logger import get_logger
@@ -19,14 +18,14 @@ from src.utils.helpers import get_relative_path
 logger = get_logger(__name__)
 
 
-def create_animation(dataset, column, out_path, freq='Q', use_cache=False):
+def create_animation(dataset, column, output_path, freq='Q', use_cache=False):
     """
     Creates a GIF animation of a GeoDataFrame column over time with optional aggregation and caching.
 
     Parameters:
         dataset: GeoDataFrame with 'Date' column and geometry.
         column: Column to visualize (e.g., 'AQI_avg').
-        out_path: Path to save the GIF.
+        output_path: Path to save the GIF.
         freq: Frequency of aggregation: 'D' = daily, 'M' = monthly, 'Q' = seasonal.
         use_cache: If True, temporary frames are stored in ./cache_frames folder.
     """
@@ -104,7 +103,7 @@ def create_animation(dataset, column, out_path, freq='Q', use_cache=False):
             buf.close()
 
     # Save GIF
-    gif_name = os.path.join(out_path, f"Average_{column}_timeseries_{freq}.gif")
+    gif_name = os.path.join(output_path, f"Average_{column}_timeseries_{freq}.gif")
     if use_cache:
         with imageio.get_writer(gif_name, mode='I', duration=0.5) as writer:
             for file in temp_files:
@@ -121,7 +120,6 @@ def create_animation(dataset, column, out_path, freq='Q', use_cache=False):
 
 def create_heatmap_folium(dataset, index_column, path_dir, file_html, center_lat=None, center_lon=None):
     """
-
     """
     # Ensure your dataset has datetime
     dataset['Date'] = pd.to_datetime(dataset['Date'])
@@ -190,12 +188,10 @@ def create_heatmap_folium(dataset, index_column, path_dir, file_html, center_lat
     basemap.save(f"{Path(path_dir).parent}/{file_html}_{index_column}.html")
     logger.info(f"Map created – open '{file_html}_{index_column}.html' to view.")
 
-def create_air_map(path_dir: str, file_html: str):
+def generate_air_map(path_dir: str, filename: str):
+    """    
     """
-    Creates polygon map for Day 3 exercises
-    
-    """
-    logger.info(f"Hello from {path_dir}")
+    logger.info(f"Generating {path_dir}")
     
     # Load the shapefile for pakistan admin boundaries
     shapefile_path = "data/pakistan_admin/gadm41_PAK_3.shp"
@@ -205,17 +201,6 @@ def create_air_map(path_dir: str, file_html: str):
     admin_gdf = admin_gdf[admin_gdf['NAME_3'].isin(admin_of_interest)]
     admin_gdf = admin_gdf[['COUNTRY', 'NAME_1', 'NAME_2', 'NAME_3', 'TYPE_3', 'geometry']]
     admin_gdf = admin_gdf.reset_index(drop=True)
-
-    # Ensure the CRS is WGS84 (EPSG:4326) so it works with Folium
-    if admin_gdf is not None and admin_gdf.crs.to_string() != "EPSG:4326":
-        admin_gdf = admin_gdf.to_crs(epsg=4326)
-
-    # Calculate a center for the map, e.g., the mean of the bounds
-    bounds = admin_gdf.total_bounds  # [minx, miny, maxx, maxy]
-    center_lat = (bounds[1] + bounds[3]) / 2
-    center_lon = (bounds[0] + bounds[2]) / 2
-
-    logger.info(f"Center Lat Lon: {center_lat, center_lon}")
 
     # Read historical air pollution dataset for lahore
     lhr_ap_df = pd.read_csv("data/PAK_misc/historical_air_pollution_all_lahore.csv")
@@ -243,6 +228,16 @@ def create_air_map(path_dir: str, file_html: str):
     # Clean up 
     del daily_ap_lhr_df, daily_aqi_lhr_df, lhr_ap_df
 
+    # Ensure the CRS is WGS84 (EPSG:4326) so it works with Folium
+    if admin_gdf is not None and admin_gdf.crs.to_string() != "EPSG:4326":
+        admin_gdf = admin_gdf.to_crs(epsg=4326)
+
+    # Calculate a center for the map, e.g., the mean of the bounds
+    bounds = admin_gdf.total_bounds  # [minx, miny, maxx, maxy]
+    center_lat = (bounds[1] + bounds[3]) / 2
+    center_lon = (bounds[0] + bounds[2]) / 2
+
+
     # Add geometry to our historical AQI data
 
     # Broadcast city geometry over the dataframe
@@ -260,10 +255,11 @@ def create_air_map(path_dir: str, file_html: str):
     aqi_lhr_gdf.drop(columns=['key'], inplace=True)
 
     # Create maps with the desired data and column
-    create_animation(dataset=aqi_lhr_gdf, column='AQI_score', out_path=str(Path(path_dir).parent))
-    create_heatmap_folium(aqi_lhr_gdf, 'AQI_score', path_dir, file_html, center_lat, center_lon)
+    create_animation(dataset=aqi_lhr_gdf, column='AQI_score', output_path=str(Path(path_dir).parent))
+    create_heatmap_folium(aqi_lhr_gdf, 'AQI_score', path_dir, filename, center_lat, center_lon)
 
 
 if __name__ == "__main__":
-    out_filename = 'air_quality_lahore'
-    create_air_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)
+    # TODO: Refactor, clean and beautify this map
+    filename = 'air_quality_lahore'
+    generate_air_map(path_dir=str(get_relative_path(__file__)), filename=filename)

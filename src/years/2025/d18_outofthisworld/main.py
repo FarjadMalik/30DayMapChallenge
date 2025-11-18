@@ -3,11 +3,10 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import geopandas as gpd
-import matplotlib.pyplot as plt
 
 from pathlib import Path
 from shapely import Point
-from folium.plugins import MarkerCluster, HeatMap
+from folium.plugins import MarkerCluster
 
 from src.utils.logger import get_logger
 from src.utils.helpers import get_relative_path
@@ -149,29 +148,12 @@ def eda_and_clean_dataset(ds : pd.DataFrame) -> gpd.GeoDataFrame:
 
     return meteorite_landings
     
-def generate_map(path_dir: str, file_out: str):
+def create_html(dataset, output_path):
     """
-    Creates polygon map for Day 3 exercises
-    
     """
-    logger.info(f"Hello from {path_dir}")
-    
-    # Read Meteorite Landing dataset
-    file_meteorite_landing = "data/Meteorite_Landings_NASA.csv"
-    meteorite_df = pd.read_csv(file_meteorite_landing)
-    meteorite_landings = eda_and_clean_dataset(meteorite_df)
-    
-    # Clean up and see if our dataset has valid rows
-    del meteorite_df    
-    if meteorite_landings is None or len(meteorite_landings) < 1:
-        return None
-    
-    logger.debug(f"Meteorite Landings len: {len(meteorite_landings)}")
-    logger.debug(f"Meteorite Landings columns: {meteorite_landings.columns}")
-
     # Compute center of the map = mean of lat/lon
-    center_lat = meteorite_landings.geometry.y.mean()
-    center_lon = meteorite_landings.geometry.x.mean()
+    center_lat = dataset.geometry.y.mean()
+    center_lon = dataset.geometry.x.mean()
 
     # Create and Center a base map
     basemap = folium.Map([center_lat, center_lon], zoom_start=3, tiles='CartoDB Positron')
@@ -179,7 +161,7 @@ def generate_map(path_dir: str, file_out: str):
     # Add desired data to the basemap
     # Initialize a marker cluster layer
     marker_cluster = MarkerCluster(name="Meteor Clusters").add_to(basemap)
-    for _, row in meteorite_landings.iterrows():
+    for _, row in dataset.iterrows():
         lat = row.geometry.y
         lon = row.geometry.x
 
@@ -213,12 +195,31 @@ def generate_map(path_dir: str, file_out: str):
     
     # Allows toggling between layers interactively 
     folium.LayerControl().add_to(basemap)
-    # Save the map to an HTML file
-    basemap.save(f"{Path(path_dir).parent}/{file_out}.html")
-    logger.info(f"Map created – open '{file_out}.html' to view.")
+    basemap.save(f"{output_path}.html")
+    
+def generate_map(path_dir: str, filename: str):
+    """
+    """
+    logger.info(f"Generating {path_dir}")
+    
+    # Read Meteorite Landing dataset
+    file_meteorite_landing = "data/Meteorite_Landings_NASA.csv"
+    meteorite_df = pd.read_csv(file_meteorite_landing)
+    meteorite_landings = eda_and_clean_dataset(meteorite_df)
+    
+    # Clean up and see if our dataset has valid rows
+    del meteorite_df    
+    if meteorite_landings is None or len(meteorite_landings) < 1:
+        return None
+    
+    # Generate and save map
+    output_path = f"{Path(path_dir).parent}/{filename}"
+    create_html(meteorite_landings, output_path)
+
+    logger.info(f"Map created – open '{filename}' to view.")
 
 
 if __name__ == "__main__":
     # meteor showers over earth
-    out_filename = 'outofthisworld'
-    generate_map(path_dir=str(get_relative_path(__file__)), file_out=out_filename)
+    filename = 'outofthisworld'
+    generate_map(path_dir=str(get_relative_path(__file__)), filename=filename)

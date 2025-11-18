@@ -1,6 +1,6 @@
 import folium
 import json
-import geopandas as gpd
+import matplotlib.pyplot as plt
 
 from pathlib import Path
 from src.utils.logger import get_logger
@@ -44,26 +44,14 @@ def load_routes(routes_json: dict) -> list[dict]:
     logger.info(f"Loaded {len(trips)} trips.")
     return trips
 
-def create_routes_map(path_dir: str, file_html: str):
-    """
-    Creates routes map from Google Takeout data and saves it as an HTML file.
-    
-    """
-    logger.info(f"Hello from {path_dir}")
-    
-    # Read the commute routes json file
-    routes_path = "data/Takeout/Maps/Commute routes/Commute routes.json"
-    routes_json = json.load(open(routes_path))
-    trips = load_routes(routes_json)
-    logger.info(f"Trips: {trips}")
-
+def create_html(trips, output_path):
     # Calculate center for the map
     all_lat = [lat for tr in trips for lat,_ in (tr["src"], tr["dst"])]
     all_lon = [lon for tr in trips for _,lon in (tr["src"], tr["dst"])]
     map_center = (sum(all_lat)/len(all_lat), sum(all_lon)/len(all_lon))
     
     # Create the Folium map, centered on Pakistan (admin boundaries center)
-    basemap = folium.Map(location=map_center, zoom_start=10, tiles='OpenStreetMap')
+    basemap = folium.Map(location=map_center, zoom_start=5, tiles='OpenStreetMap')
 
     # Plot the routes on a map    
     for tr in trips:
@@ -74,17 +62,42 @@ def create_routes_map(path_dir: str, file_html: str):
             opacity=0.8,
             popup=f'Trip Id: {tr["id"]}, Transportation Mode: {tr["t_mode"]}'
         ).add_to(basemap)
-        # optionally: mark source & destination
+        # mark source & destination
         folium.Marker(tr["src"], tooltip="Start", icon=folium.Icon(color="green")).add_to(basemap)
         folium.Marker(tr["dst"], tooltip="End", icon=folium.Icon(color="red")).add_to(basemap)
 
     # Allows toggling between layers interactively 
     folium.LayerControl().add_to(basemap)
-    # Save the map to an HTML file
-    basemap.save(f"{Path(path_dir).parent}/{file_html}.html")
-    logger.info(f"Map created – open '{file_html}.html' to view.")
+    basemap.save(f"{output_path}.html")
+
+# def create_png(trips, output_path):
+
+#     # Calculate center for the map
+#     all_lat = [lat for tr in trips for lat,_ in (tr["src"], tr["dst"])]
+#     all_lon = [lon for tr in trips for _,lon in (tr["src"], tr["dst"])]
+#     map_center = (sum(all_lat)/len(all_lat), sum(all_lon)/len(all_lon))
+
+def generate_routes_map(path_dir: str, filename: str):
+    """
+    Creates routes map from Google Takeout data and saves it as an HTML file.
+    
+    """
+    logger.info(f"Generating {path_dir}")
+    
+    # Read the commute routes json file
+    routes_path = "data/Takeout/Maps/Commute routes/Commute routes.json"
+    routes_json = json.load(open(routes_path))
+    trips = load_routes(routes_json)
+    logger.info(f"Trips: {trips}")
+    
+    # Generate and Save the map
+    output_path = f"{Path(path_dir).parent}/{filename}"
+    create_html(trips, output_path)
+    # create_png(trips, output_path)
+
+    logger.info(f"Map created – open '{filename}.html' to view.")
 
 
 if __name__ == "__main__":
-    out_filename = 'Google_routes_map'
-    create_routes_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)
+    filename = 'Google_routes_map'
+    generate_routes_map(path_dir=str(get_relative_path(__file__)), filename=filename)

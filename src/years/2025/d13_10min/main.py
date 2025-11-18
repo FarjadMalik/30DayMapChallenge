@@ -13,31 +13,13 @@ from src.utils.helpers import get_relative_path
 logger = get_logger(__name__)
 
 
-def generate_map(path_dir: str, file_html: str):
+def create_png(dataset, column_to_use, output_path):
     """
-    Creates polygon map for Day 3 exercises
-    
     """
-    logger.info(f"Hello from {path_dir}")
     # Create a Mercator project
     proj = ccrs.Mercator()
+    dataset = dataset.to_crs(proj.proj4_init)
     
-    # Load the shapefile for world admin boundaries
-    world_gdf = gpd.read_file("data/countries.geojson")
-    world_gdf = world_gdf.to_crs(proj.proj4_init)
-    world_gdf = world_gdf[~world_gdf["name"].isin(["Antarctica"])]
-
-    # Add countries i have been to
-    world_gdf["visited"] = world_gdf["name"].apply(
-        lambda x: (
-            0 if x in ["Belgium", "Pakistan"]
-            else 
-                1 if x in ["Italy", "Spain", "Germany", "United Kingdom", 
-                            "Netherlands", "Austria", "India", "France"] 
-                else 2  
-        )
-    )
-
     # Load plot beautifications
     font = load_font(
         "https://github.com/BornaIz/markazitext/blob/master/fonts/ttf/MarkaziText-Regular.ttf?raw=true"
@@ -51,7 +33,7 @@ def generate_map(path_dir: str, file_html: str):
     ax.axis("off")
 
     # Plot world
-    world_gdf.plot(ax=ax, column="visited", edgecolor="black", lw=0.2, cmap=cmap)
+    dataset.plot(ax=ax, column=column_to_use, edgecolor="black", lw=0.2, cmap=cmap)
 
     fig.text(
         x=0.5,
@@ -118,14 +100,37 @@ def generate_map(path_dir: str, file_html: str):
         ha="right",
         size=8,
     )
-
     
     plt.tight_layout()
-    # Save as image
-    output_path = Path(path_dir).parent / f"{file_html}.png"
     plt.savefig(output_path, dpi=500, bbox_inches="tight")
+
+def generate_map(path_dir: str, filename: str):
+    """    
+    """
+    logger.info(f"Generating {path_dir}")
+
+    # Load the shapefile for world admin boundaries
+    world_gdf = gpd.read_file("data/countries.geojson")
+    world_gdf = world_gdf[~world_gdf["name"].isin(["Antarctica"])]
+    
+    # Add countries i have been to
+    world_gdf["visited"] = world_gdf["name"].apply(
+        lambda x: (
+            0 if x in ["Belgium", "Pakistan"]
+            else 
+                1 if x in ["Italy", "Spain", "Germany", "United Kingdom", 
+                            "Netherlands", "Austria", "India", "France"] 
+                else 2  
+        )
+    )
+
+    # Generate and save map
+    output_path = Path(path_dir).parent / f"{filename}"
+    create_png(world_gdf, "visited", output_path)
+
+    logger.info(f"Map created – open '{filename}' to view.")
 
 if __name__ == "__main__":
     # --- Plot countries you have been (use fonts and custom legend)---
-    out_filename = '10min_map'
-    generate_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)
+    filename = '10min_map'
+    generate_map(path_dir=str(get_relative_path(__file__)), filename=filename)
