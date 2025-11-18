@@ -2,10 +2,13 @@ import fiona
 import folium
 import pandas as pd
 import geopandas as gpd
+import matplotlib.pyplot as plt
 
-from branca.element import Template, MacroElement
 from pathlib import Path
+from matplotlib.patches import Patch
+from branca.element import Template, MacroElement
 from shapely.geometry import MultiPolygon, GeometryCollection, Polygon
+
 from src.utils.logger import get_logger
 from src.utils.helpers import get_relative_path
 
@@ -13,66 +16,19 @@ from src.utils.helpers import get_relative_path
 logger = get_logger(__name__)
 
 
-def create_polygon_map(path_dir: str, file_html: str):
-    """
-    Creates polygon map for Day 3 exercises
+def create_folium_map(dataset, output_path):
     
-    """
-    logger.info(f"Hello from {path_dir}")
-    
-    # Load the shapefile for pakistan admin boundaries
-    shapefile_path = "data/pakistan_admin/gadm41_PAK_3.shp"
-    admin_gdf = gpd.read_file(shapefile_path)
-
-    # # Ensure the CRS is WGS84 (EPSG:4326) so it works with Folium
-    # if admin_gdf is not None and admin_gdf.crs.to_string() != "EPSG:4326":
-    #     admin_gdf = admin_gdf.to_crs(epsg=4326)
-
     # Calculate a center for the map, e.g., the mean of the bounds
-    bounds = admin_gdf.total_bounds  # [minx, miny, maxx, maxy]
+    bounds = dataset.total_bounds  # [minx, miny, maxx, maxy]
     center_lat = (bounds[1] + bounds[3]) / 2
     center_lon = (bounds[0] + bounds[2]) / 2
 
     # Create the Folium map, centered on Pakistan (admin boundaries center)
     basemap = folium.Map(location=[center_lat, center_lon], zoom_start=6, tiles='OpenStreetMap')
 
-    # No need to add the administrative boundaries layer
-
-    # Load hydro/rivers layer from geopackage
-    file_ipc_food_insecurity = "data/PAK_misc/AcuteFoodInsecurity_ipc_pak_area_long_latest.csv"
-    ipc_df = pd.read_csv(file_ipc_food_insecurity)
-    # Filter for current projection and get all phases/levels (1-5)
-    ipc_df = ipc_df.loc[(ipc_df['Validity period'] == 'first projection') & (ipc_df['Phase'] == 'all')]
-    # Keep only relevant columns
-    ipc_df = ipc_df[['Date of analysis', 'Area', 'Level 1', 'Number', 'Percentage']]
-
-    # Read ipc geojson
-    ipc_pak_geojson = "data/PAK_misc/ipc_pak.geojson"
-    ipc_gdf = gpd.read_file(ipc_pak_geojson)
-    # Keep only relevant columns
-    ipc_gdf = ipc_gdf[['title', 'geometry', 'confidence_level', 'overall_phase', 'color', 'estimated_population']]
-
-    # Merge ipc_gdf with ipc_df to get phase information
-    ipc_pak_gdf = ipc_gdf.merge(ipc_df, left_on='title', right_on='Area', how='inner')
-
-    # Function to convert GeometryCollection to MultiPolygon
-    def convert_geomcollection_to_multipolygon(geom):
-        if isinstance(geom, GeometryCollection):
-            # Extract polygons from GeometryCollection parts
-            polygons = [part for part in geom.geoms if isinstance(part, Polygon)]
-            # Return MultiPolygon constructed from polygons
-            return MultiPolygon(polygons)
-        else:
-            return geom
-
-    # Apply the conversion function to the geometry column
-    ipc_pak_gdf['geometry'] = ipc_pak_gdf['geometry'].apply(convert_geomcollection_to_multipolygon)
-    # Clean up
-    del ipc_gdf, ipc_df
-
     # Add IPC polygons to the map
     folium.GeoJson(
-        ipc_pak_gdf,
+        dataset,
         name='Acute Food Insecurity Areas Pakistan',
         style_function=lambda feature: {
             'fillColor': feature['properties']['color'],
@@ -135,10 +91,102 @@ def create_polygon_map(path_dir: str, file_html: str):
     # Allows toggling between layers interactively 
     folium.LayerControl().add_to(basemap)
     # Save the map to an HTML file
-    basemap.save(f"{Path(path_dir).parent}/{file_html}.html")
-    logger.info(f"Map created – open '{file_html}.html' to view.")
+    basemap.save(output_path)    
+
+def create_png_map(dataset, output_path):
+    
+    # Calculate a center for the map, e.g., the mean of the bounds
+    bounds = dataset.total_bounds  # [minx, miny, maxx, maxy]
+    center_lat = (bounds[1] + bounds[3]) / 2
+    center_lon = (bounds[0] + bounds[2]) / 2
+
+    # create fig and axis
+    fig, ax = plt.subplots(figsize=(12, 10))
+    
+    # plot polygons with colors
+    dataset.plot(
+        ax=ax,
+        color=dataset['color'], # fill
+        edgecolor=dataset['color'], # outline
+        linewidth=1,
+        alpha=0.7
+    )
+    lat_range = 6
+    lon_range =6
+    ax.set_xlim(center_lon - lon_range, center_lon + lon_range)
+    ax.set_ylim(center_lat - lat_range, center_lat + lat_range)
+
+    # Add title & legend
+    ax.set_title(
+        "IPC Acute Food Insecurity Levels - Pakistan",
+        fontsize=18,
+        fontweight="bold",
+        pad=20
+    )
+
+    legend_elements = []
+    for phase, color in dataset[['overall_phase', 'color']].drop_duplicates().values:
+        legend_elements.append(Patch(facecolor=color, edgecolor=color,
+                                     label=f"Level {phase}"))
+    ax.legend(
+        handles=legend_elements,
+        title="IPC Food Phases",
+        loc="lower left",
+        frameon=True
+    )
+
+    # Beautify and save
+    ax.set_axis_off()
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=500, bbox_inches="tight")
+
+def generate_polygon_map(path_dir: str, file_out: str):
+    """
+    Creates polygon map for Day 3 exercises
+    
+    """
+    logger.info(f"Hello from {path_dir}")
+    
+    # Load IPC Acute Food Insecurity layer dataset
+    file_ipc_food_insecurity = "data/PAK_misc/AcuteFoodInsecurity_ipc_pak_area_long_latest.csv"
+    ipc_df = pd.read_csv(file_ipc_food_insecurity)
+    # Filter for current projection and get all phases/levels (1-5)
+    ipc_df = ipc_df.loc[(ipc_df['Validity period'] == 'first projection') & (ipc_df['Phase'] == 'all')]
+    # Keep only relevant columns
+    ipc_df = ipc_df[['Date of analysis', 'Area', 'Level 1', 'Number', 'Percentage']]
+
+    # Read ipc geojson
+    ipc_pak_geojson = "data/PAK_misc/ipc_pak.geojson"
+    ipc_gdf = gpd.read_file(ipc_pak_geojson)
+    # Keep only relevant columns
+    ipc_gdf = ipc_gdf[['title', 'geometry', 'confidence_level', 'overall_phase', 'color', 'estimated_population']]
+
+    # Merge ipc_gdf with ipc_df to get phase information
+    ipc_pak_gdf = ipc_gdf.merge(ipc_df, left_on='title', right_on='Area', how='inner')
+
+    # Function to convert GeometryCollection to MultiPolygon
+    def convert_geomcollection_to_multipolygon(geom):
+        if isinstance(geom, GeometryCollection):
+            # Extract polygons from GeometryCollection parts
+            polygons = [part for part in geom.geoms if isinstance(part, Polygon)]
+            # Return MultiPolygon constructed from polygons
+            return MultiPolygon(polygons)
+        else:
+            return geom
+
+    # Apply the conversion function to the geometry column
+    ipc_pak_gdf['geometry'] = ipc_pak_gdf['geometry'].apply(convert_geomcollection_to_multipolygon)
+    # Clean up
+    del ipc_gdf, ipc_df
+    
+    # Create different types of maps
+    output_path = f"{Path(path_dir).parent}/{file_out}"
+    create_folium_map(ipc_pak_gdf, f"{output_path}.html")
+    # create_png_map(ipc_pak_gdf, f"{output_path}.png")
+    
+    logger.info(f"Map created – open '{file_out}' to view.")
 
 
 if __name__ == "__main__":
     out_filename = 'AcuteFoodInsecurity_pakistan'
-    create_polygon_map(path_dir=str(get_relative_path(__file__)), file_html=out_filename)
+    generate_polygon_map(path_dir=str(get_relative_path(__file__)), file_out=out_filename)
