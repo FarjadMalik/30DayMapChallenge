@@ -2,6 +2,7 @@ import fiona
 import folium
 import geopandas as gpd
 import matplotlib.pyplot as plt
+import contextily as ctx
 
 from pathlib import Path
 from matplotlib.patches import Patch
@@ -57,6 +58,10 @@ def create_html(admin, dataset, output_path):
 def create_png(admin, dataset, output_path):
     """
     """
+    # Ensure Web Mercator CRS for contextily
+    dataset = dataset.to_crs(epsg=3857)
+    admin = admin.to_crs(epsg=3857)
+
     # Calculate a center for the map, e.g., the mean of the bounds
     bounds = admin.total_bounds  # [minx, miny, maxx, maxy]
     center_lat = (bounds[1] + bounds[3]) / 2
@@ -68,10 +73,14 @@ def create_png(admin, dataset, output_path):
     # plot admin boundaries
     admin.plot(
         ax=ax,
-        color='white',
+        facecolor='white',
         edgecolor='black',
-        linewidth=1
+        linewidth=1,
+        alpha=0.2
     )
+    # add basemap (will respect current axis extent)
+    # logger.debug(f"CTX providers - {ctx.providers.OpenStreetMap.keys()}")
+    ctx.add_basemap(ax, crs=admin.crs, source=ctx.providers.OpenStreetMap.Mapnik)
     
     # plot polygons with colors
     dataset.plot(
@@ -79,8 +88,14 @@ def create_png(admin, dataset, output_path):
         color='blue', 
         alpha=0.8
     )
-    ax.set_xlim(center_lon - 9, center_lon + 9)
-    ax.set_ylim(center_lat - 9, center_lat + 9)
+
+    # these are in degrees, to work with contextily use meters as given below
+    # ax.set_xlim(center_lon - 9, center_lon + 9)
+    # ax.set_ylim(center_lat - 9, center_lat + 9)
+    # Set extent BEFORE basemap
+    padding = 50_000  # 50 km padding
+    ax.set_xlim(bounds[0] - padding, bounds[2] + padding)
+    ax.set_ylim(bounds[1] - padding, bounds[3] + padding)
 
     # Add title & legend
     ax.set_title(
@@ -94,12 +109,12 @@ def create_png(admin, dataset, output_path):
     ax.legend(
         handles=[Patch(facecolor='blue', edgecolor='blue',
                                      label=f"Flood Extents")],
-        title="Floods Pakistan 2025",
+        title="",
         loc="upper left",
         frameon=True
     )
     ax.set_axis_off()
-    plt.tight_layout()
+    # plt.tight_layout()
     plt.savefig(output_path, dpi=500, bbox_inches="tight")
 
 def generate_earth_map(path_dir: str, filename: str):

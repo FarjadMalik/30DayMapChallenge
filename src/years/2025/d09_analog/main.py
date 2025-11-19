@@ -21,14 +21,7 @@ def create_html(admin, maps_info, output_path):
     if admin is not None and admin.crs.to_string() != "EPSG:4326":
         admin = admin.to_crs(epsg=4326)
         
-    # Calculate a center for the map, e.g., the mean of the bounds
-    bounds = admin.total_bounds  # [minx, miny, maxx, maxy]
-    center_lat = (bounds[1] + bounds[3]) / 2
-    center_lon = (bounds[0] + bounds[2]) / 2
-
-    # Create base folium map 
-    basemap = folium.Map(location=[center_lat, center_lon], zoom_start=6, tiles='OpenStreetMap')
-      
+    basemap = None
     # Add each map one by one
     for map in maps_info: 
         # Load land cover land use layer 
@@ -49,6 +42,13 @@ def create_html(admin, maps_info, output_path):
         # Normalize image values to 0–1 for display
         img = img.astype(float)
         img = (img - np.nanmin(img)) / (np.nanmax(img) - np.nanmin(img))
+
+        # Calculate a center for the map, e.g., the mean of the bounds
+        center_lat = (bounds[1] + bounds[3]) / 2
+        center_lon = (bounds[0] + bounds[2]) / 2
+        if basemap is None:
+            # Create base folium map 
+            basemap = folium.Map(location=[center_lat, center_lon], zoom_start=6, tiles='OpenStreetMap')
 
         folium.raster_layers.ImageOverlay(
             name="Ancient India Map",

@@ -34,10 +34,10 @@ def map_projection(ax, projection, title, extent=None):
     gl.right_labels = False
     gl.xlabel_style = {'size': 8}
     gl.ylabel_style = {'size': 8}
-    # Plot some sample points
-    lons = np.random.uniform(-180, 180, 100)
-    lats = np.random.uniform(-80, 80, 100)
-    ax.scatter(lons, lats, transform=ccrs.PlateCarree(), color='red', s=8, alpha=0.7)
+    # # Plot some sample points
+    # lons = np.random.uniform(-180, 180, 100)
+    # lats = np.random.uniform(-80, 80, 100)
+    # ax.scatter(lons, lats, transform=ccrs.PlateCarree(), color='red', s=8, alpha=0.7)
     
 def create_projection_png(projections, output_path):
     # Create figure
@@ -55,14 +55,14 @@ def create_projection_png(projections, output_path):
         axes.append(ax)
 
     # Add a super-title
-    fig.suptitle(f"Comparison of {len(projections)} Cartopy Map Projections", fontsize=16)
+    fig.suptitle(f"Comparison of Major Cartopy Map Projections", fontsize=16)
 
     # Adjust spacing so things are not overlapping
     # Use tight_layout with padding, plus adjust top for suptitle
     plt.tight_layout(pad=3.0, w_pad=2.0, h_pad=2.0)  # pad, width-pad, height-pad :contentReference[oaicite:0]{index=0}
     fig.subplots_adjust(top=0.88)  # leave room for suptitle :contentReference[oaicite:1]{index=1}
        
-    plt.savefig(f"{output_path}_{len(projections)}", dpi=500, bbox_inches="tight")
+    plt.savefig(f"{output_path}_{len(projections)}", dpi=300, bbox_inches="tight")
 
 def generate_map(path_dir: str, filename: str):
     """   

@@ -19,15 +19,10 @@ def create_raster_png(admin, raster, raster_bounds, title, output_path, text=Non
     if admin is not None and admin.crs.to_string() != "EPSG:4326":
         admin = admin.to_crs(epsg=4326)
 
-    # Calculate a center for the map, e.g., the mean of the bounds
-    bounds = admin.total_bounds  # [minx, miny, maxx, maxy] 
-    center_lat = (bounds[1] + bounds[3]) / 2
-    center_lon = (bounds[0] + bounds[2]) / 2
-
     fig, ax = plt.subplots(figsize=(8,6))
     
     # Plot the polygon layer first, boundary only if needed
-    # world.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=1.0)
+    # admin.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=1.0)
 
     # Plot the mask raster on top  
     # We need to consider the spatial extent if this is georeferenced.

@@ -31,7 +31,7 @@ def create_png(dataset, column_to_use, output_path):
         k=5,
     )
     # Beautification
-    ax.set_title("2025 - Population Density by Districts")
+    ax.set_title("2025 - Population Density (Per Km) by Districts")
     ax.axis("off")
     plt.savefig(output_path, dpi=500, bbox_inches="tight")
 
