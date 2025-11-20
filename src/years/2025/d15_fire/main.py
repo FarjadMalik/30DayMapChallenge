@@ -87,7 +87,7 @@ def create_animation(admin, dataset, column_to_use, output_path):
         # plt.savefig(f"{out_dir}/{file_out}_{y}.png", dpi=500, bbox_inches="tight")
 
     # Create an animation with the images from each year
-    imageio.mimsave(f"{output_path}.gif", frames, duration=2.0)
+    imageio.mimsave(f"{output_path}.gif", frames, duration=2.0, loop=0)
     
 def generate_map(path_dir: str, filename: str):
     """    

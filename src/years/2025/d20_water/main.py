@@ -1,10 +1,15 @@
-import folium
-import geopandas as gpd
+import glob
+import rasterio
+import imageio
+import numpy as np
+import contextily as ctx
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
 import matplotlib.pyplot as plt
 
 from pathlib import Path
-from matplotlib.patches import Patch
-from branca.element import Template, MacroElement
+from typing import List, Dict, Tuple   
+from rasterio.warp import transform_bounds
 
 from src.utils.logger import get_logger
 from src.utils.helpers import get_relative_path
@@ -13,183 +18,171 @@ from src.utils.helpers import get_relative_path
 logger = get_logger(__name__)
 
 
-def create_html(admin, dataset, output_path):
+def read_rasters(tif_files: List[str]) -> Tuple[np.ndarray, dict | None, rasterio.Affine | None]:
+   """
+   Read GeoTIFFs into a 3D numpy array (time, rows, cols). Reads only 1 band.
+   Should have the similar transform and profiles
+   
+   Returns:
+      img_arr (np.ndarray): shape (L, H, W) -> (Length of input tifs files, height, width)
+      transform: the affince transform of rasters (read from the first file)
+      meta: rasterio metadata (profile) of rasters (read from the first file)
+   """
+   img_arr = []
+   meta = None
+   transform = None
+
+   for file in tif_files:
+      with rasterio.open(file) as src:
+         band = src.read(1)
+         nodata = src.nodata
+         if nodata is not None:  # If nodata is set, mask and replace
+            mask = band == nodata 
+            band[mask] = 0.0     # Replace nodata pixels with 0
+
+         img_arr.append(band.astype(np.float32))
+
+
+         if meta is None:
+            meta = src.profile
+            transform = src.transform
+   
+   data = np.stack(img_arr, axis=0)
+   return data, meta, transform
+
+def create_monthly_animation(dataset, meta, transform, output_path: str, 
+                             cmap: str = 'Blues', duration: float = 0.5):
    """
    """
-   # Ensure the CRS is WGS84 (EPSG:4326) so it works with Folium
-   if admin is not None and admin.crs.to_string() != "EPSG:4326":
-         admin = admin.to_crs(epsg=4326)
-   if admin.crs != dataset.crs:
-      dataset = dataset.to_crs(admin.crs)
-      
-   # Calculate a center for the map, e.g., the mean of the bounds
-   bounds = admin.total_bounds  # [minx, miny, maxx, maxy]
-   center_lat = (bounds[1] + bounds[3]) / 2
-   center_lon = (bounds[0] + bounds[2]) / 2
-
-   # Create and Center a base map
-   basemap = folium.Map(location=[center_lat, center_lon], zoom_start=7, 
-                        tiles='OpenStreetMap')
-
-   # Add the administrative boundaries layer
-   folium.GeoJson(
-         admin,
-         name='Administrative Boundaries',
-         style_function=lambda feature: {
-            'fillColor': None,
-            'color': 'black',
-            'weight': 1,
-            'opacity': 0.5
-         },
-         tooltip=folium.GeoJsonTooltip(
-            fields=['NAME_1'], 
-            aliases=['Province:']
-         )
-   ).add_to(basemap)
-
-   # Add dataset
-   folium.GeoJson(
-       dataset,
-       name='',
-       style_function=lambda feature: {
-           'fillColor': feature['properties']['color'],
-           'color': feature['properties']['color'],
-           'weight': 1,
-           'fillOpacity': 0.5
-       },
-       tooltip=folium.GeoJsonTooltip(
-           fields=[''],
-           aliases=[''],
-           localize=True
-       )
-   ).add_to(basemap)
-
-   # items = "".join([
-   #      f'<i style="background:{name};width:12px;height:12px;display:inline-block;margin-right:5px;"></i>'
-   #      f'{name}<br>'
-   #      for name in dataset.amenity.unique()
-   #  ])
-
-   # legend_html = """{% macro html(this, kwargs) %}
-   # <div style="position: fixed; 
-   #             top: 10px; left: 50px; width: 320px; z-index:9999; 
-   #             background-color: white; border:2px solid grey; border-radius:5px; 
-   #             padding: 10px; font-size:14px;">
-   #    <h4 style="margin-bottom:10px;"><b>Educational Institutes Per Province</b></h4>
-      
-   #    <b>Items:</b><br>
-   #    """ + items + """
-   # </div>
-   # {% endmacro %}
-   # """
-   # legend = MacroElement()
-   # legend._template = Template(legend_html)
-   # basemap.get_root().add_child(legend)
+   imgs = []
    
-   # # Add title
-   # title_html = '''
-   # <h3 align="center" style="font-size:20px; font-weight:bold; margin-top:10px">
-   #    TITLE
-   # </h3>
-   # '''
-   # basemap.get_root().html.add_child(folium.Element(title_html))
+   # compute bounds (left, bottom, right, top) and src crs
+   src_crs = meta.get("crs", None)
+   if src_crs is None:
+      raise RuntimeError(f"Input Rasters have no CRS defined - {src_crs}")
+   left, bottom = transform * (0, meta["height"])
+   right, top = transform * (meta["width"], 0)
 
-   # Allows toggling between layers interactively 
-   folium.LayerControl().add_to(basemap)
-   # Save and exit
-   basemap.save(f"{output_path}.html")
-   
-def create_png(admin, dataset, output_path):
+   vmin = np.nanmin(dataset)
+   vmax = np.nanmax(dataset)
+   norm = plt.Normalize(vmin=vmin,vmax=vmax)
+
+   # for each time input create a separate img
+   for t in range(dataset.shape[0]):
+      fig = plt.figure(figsize=(8, 5))
+      # Use a geographic projection
+      ax = plt.axes(projection=ccrs.PlateCarree())
+      ax.set_extent([left, right, bottom, top], crs=ccrs.PlateCarree())
+      # Add basemap features (coastlines, borders)
+      ax.add_feature(cfeature.COASTLINE, linewidth=0.5)
+      ax.add_feature(cfeature.BORDERS, linewidth=0.5)
+      ax.add_feature(cfeature.LAND, facecolor="lightgray", zorder=0)
+      # add our dataset to the map with the correct extent/transform
+      im = ax.imshow(dataset[t, :, :],
+                     cmap=cmap, 
+                     norm=norm,
+                     extent=(left, right, bottom, top),
+                     origin="upper",
+                     transform=ccrs.PlateCarree(),
+                     zorder=1,
+                     )
+      # Beautify the map
+      ax.set_title(f"Month {t+1}")
+      ax.set_axis_off()
+      cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+      cb.set_label("Percipitation")
+
+      # save fig to a buffer list for animation
+      fig.canvas.draw()
+      # Use buffer_rgba (returns an RGBA buffer)
+      buf = fig.canvas.renderer.buffer_rgba()
+      # Convert to a NumPy array
+      img_arr = np.asarray(buf, dtype=np.uint8)
+      # img_arr will have shape (height, width, 4) because of RGBA
+      # If you only need RGB, you can drop the alpha channel:
+      # img_rgb = img_arr[:, :, :3]
+      imgs.append(img_arr)
+
+      plt.close(fig=fig)
+
+   # save animation
+   imageio.mimsave(f"{output_path}.gif", imgs, duration=duration, loop=0)
+
+def create_seasonal_plots(dataset, meta, transform, output_path, cmap: str = 'Blues'):
    """
    """
-   # Calculate a center for the map, e.g., the mean of the bounds
-   bounds = admin.total_bounds  # [minx, miny, maxx, maxy]
-   center_lat = (bounds[1] + bounds[3]) / 2
-   center_lon = (bounds[0] + bounds[2]) / 2
+   height, width = meta["height"], meta["width"]
+   left, bottom = transform * (0, height)
+   right, top = transform * (width, 0)
+   extent = (left, right, bottom, top)
 
-   # create fig and axis
-   _, ax = plt.subplots(figsize=(12, 10))
+   vmin = min(np.nanmin(arr) for arr in dataset.values())
+   vmax = max(np.nanmax(arr) for arr in dataset.values())
+   norm = plt.Normalize(vmin=vmin, vmax=vmax)
 
-   # plot admin boundaries
-   admin.plot(
-      ax=ax,
-      color='white',
-      edgecolor='black',
-      linewidth=1
-   )
-   
-   # plot polygons with colors
-   dataset.plot(
-      ax=ax,
-      facecolor=dataset['color'], # fill
-      edgecolor=dataset['color'], # outline
-      # color='', # both fill and outline
-      linewidth=1,
-      alpha=0.7
-   )
-   # Set limits and range from the center coordinates
-   ax.set_xlim(center_lon - 9, center_lon + 9)
-   ax.set_ylim(center_lat - 9, center_lat + 9)
+   fig, axes = plt.subplots(2, 2, figsize=(12, 10), subplot_kw={"projection": ccrs.PlateCarree()})
+   axes = axes.flatten()
 
-   # Add title & legend
-   ax.set_title(
-      "TITLE",
-      fontsize=18,
-      fontweight="bold",
-      pad=20
-   )
+   for ax, (season, arr) in zip(axes, dataset.items()):
+      ax.set_extent([left, right, bottom, top], crs=ccrs.PlateCarree())
+      ax.add_feature(cfeature.COASTLINE, linewidth=0.5)
+      ax.add_feature(cfeature.BORDERS, linewidth=0.5)
+      ax.add_feature(cfeature.LAND, facecolor="lightgray", zorder=0)
 
-   # Define your color mapping for phases (for legend use, takes care of missing phases in the dataset)
-   phase_color_dict = {
-      1: '#fae61e', # Level 1
-   }
-   legend_elements = []
-   for phase, color in phase_color_dict.items():
-      legend_elements.append(Patch(facecolor=color, edgecolor=color,
-                                    label=f"Level {phase}"))
-   
-   # Beautify, add legend and save
-   ax.legend(
-      handles=legend_elements,
-      title="Legend Title",
-      loc="upper left", # legend location
-      frameon=True
-   )
-   ax.set_axis_off()
-   # plt.tight_layout()
-   plt.savefig(output_path, dpi=500, bbox_inches="tight")
+      im = ax.imshow(
+         arr,
+         cmap=cmap,
+         norm=norm,
+         extent=extent,
+         origin="upper",
+         transform=ccrs.PlateCarree(),
+         zorder=1,
+      )
+      ax.set_title(f"{season}")
+      ax.axis("off")
+
+   cb = fig.colorbar(im, ax=axes.tolist(), fraction=0.046, pad=0.04)
+   cb.set_label("Average Percipitation")
+   fig.savefig(f"{output_path}_seasonal.png", dpi=300, bbox_inches='tight')
+   plt.close(fig)
+
+def compute_seasonal_averages(data: np.ndarray) -> Dict[str, np.ndarray]:
+    """
+    Seasonal-average based on the 12 months
+    """
+    seasons = {
+        "Winter (DJF)": [11, 0, 1],
+        "Spring (MAM)": [2, 3, 4],
+        "Summer (JJA)": [5, 6, 7],
+        "Autumn (SON)": [8, 9, 10],
+    }
+    seasonal = {s: np.nanmean(data[idxs, :, :], axis=0) for s, idxs in seasons.items()}
+    return seasonal
 
 def generate_map(path_dir: str, filename: str):
    """    
    """
    logger.info(f"Generating {path_dir}")
    
-   # Load water point basic data frpm WPdx
-   waterpoint_fpath = "data/Water_Point_Data_Exchange_(WPdx-Basic)_20251120.geojson"
-   wp_gdf = gpd.read_file(waterpoint_fpath)
-   logger.debug(f"Water Point head - {wp_gdf.head()}")
-   logger.debug(f"Water Point len - {len(wp_gdf)}")
-   logger.debug(f"Water Point columns - {wp_gdf.columns}")
+   # ClimateAfrica monthly precipitation dataset for 1990-2020 
+   prec_files = glob.glob("data/Normal_1991-2020_monthly_tif_2.5m/Prec*")
+   logger.debug(f"Prec files len - {len(prec_files)}")
+
+   # Read rasters into an nd.arrary along with metadata
+   data, meta, transform = read_rasters(tif_files=prec_files)
+
+   # Generate and save map
+   output_path = f"{Path(path_dir).parent}/{filename}"
    
-   # # Load the shapefile for boundaries or admin units
-   # shapefile_path = "data/pakistan_admin/gadm41_PAK_1.shp"
-   # admin_gdf = gpd.read_file(shapefile_path)
-   # admin_gdf = admin_gdf[['COUNTRY', 'NAME_1', 'geometry']]
-
-   # # Load desired 
-   # dataset = None
-
-   # # Generate and save map
-   # output_path = f"{Path(path_dir).parent}/{filename}"
-   # create_html(admin=admin_gdf, dataset=dataset, output_path=output_path)
-   create_png(admin=admin_gdf, dataset=dataset, output_path=output_path)
+   # monthly gif for visualization 
+   create_monthly_animation(dataset=data, meta=meta, transform=transform, output_path=output_path)
+   s_dataset = compute_seasonal_averages(data=data)
+   # logger.debug(f"s_dataset - {[s_dataset[k].shape for k in s_dataset.keys()]}")
+   create_seasonal_plots(dataset=s_dataset, meta=meta, transform=transform, output_path=output_path)
 
    logger.info(f"Map created – open '{filename}' to view.")
 
 
-if __name__ == "__main__":
-   # Classical Elements 4/4: Focus on the fluid. 
-   # Map hydrology, oceans, currents, water accessibility, sea level rise, precipitation, or anything aquatic.
-   # PCP can be one. WAPOR tifs, water species, or evaporation index                        
-   filename = 'water'
+if __name__ == "__main__":                        
+   filename = 'climateaf_monthly_percipitation_2020'
    generate_map(path_dir=str(get_relative_path(__file__)), filename=filename)
