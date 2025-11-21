@@ -1,10 +1,13 @@
 import folium
+import numpy as np
+import pandas as pd
 import geopandas as gpd
+import contextily as ctx
 import matplotlib.pyplot as plt
 
 from pathlib import Path
+from shapely.geometry import Point
 from matplotlib.patches import Patch
-from branca.element import Template, MacroElement
 
 from src.utils.logger import get_logger
 from src.utils.helpers import get_relative_path
@@ -64,6 +67,16 @@ def create_html(admin, dataset, output_path):
        )
    ).add_to(basemap)
 
+   
+      #   icon_f = folium.Icon(color="black",icon='meteor',prefix='fa')
+
+      #   folium.Marker(
+      #       location=[lat, lon],
+      #       icon=icon_f,
+      #       popup=folium.Popup(popup_html, max_width=300),
+      #       tooltip=tooltip_f
+      #   ).add_to(marker_cluster)
+
    # items = "".join([
    #      f'<i style="background:{name};width:12px;height:12px;display:inline-block;margin-right:5px;"></i>'
    #      f'{name}<br>'
@@ -102,10 +115,23 @@ def create_html(admin, dataset, output_path):
 def create_png(admin, dataset, output_path):
    """
    """
+   # Web tiles (contextily) use web mercator (epsg:3857)
+   admin = admin.to_crs(epsg=3857)
+   dataset = dataset.to_crs(epsg=3857)
+   logger.debug(f"admin.crs: {admin.crs}")
+   logger.debug(f"dataset.crs: {dataset.crs}")
+
+   # Prepare marker size scaling
+   killed_raw = dataset['Killed Max'].astype(float)
+   min_s, max_s = 20, 400
+   if not killed_raw.empty:
+       scaled = (killed_raw - killed_raw.min()) / (killed_raw.max() - killed_raw.min())
+       sizes = scaled * (max_s - min_s) + min_s
+   else:
+       sizes = np.full(len(dataset), min_s)
+
    # Calculate a center for the map, e.g., the mean of the bounds
    bounds = admin.total_bounds  # [minx, miny, maxx, maxy]
-   center_lat = (bounds[1] + bounds[3]) / 2
-   center_lon = (bounds[0] + bounds[2]) / 2
 
    # create fig and axis
    _, ax = plt.subplots(figsize=(12, 10))
@@ -115,38 +141,65 @@ def create_png(admin, dataset, output_path):
       ax=ax,
       color='white',
       edgecolor='black',
-      linewidth=1
-   )
-   
-   # plot polygons with colors
-   dataset.plot(
-      ax=ax,
-      facecolor=dataset['color'], # fill
-      edgecolor=dataset['color'], # outline
-      # color='', # both fill and outline
       linewidth=1,
-      alpha=0.7
+      alpha=0.2
    )
-   # Set limits and range from the center coordinates
-   ax.set_xlim(center_lon - 9, center_lon + 9)
-   ax.set_ylim(center_lat - 9, center_lat + 9)
+
+   # these are in degrees, to work with contextily use meters as given below
+   # ax.set_xlim(center_lon - 9, center_lon + 9)
+   # ax.set_ylim(center_lat - 9, center_lat + 9)
+   # Set extent BEFORE basemap
+   padding = 50_000  # 50 km padding
+   ax.set_xlim(bounds[0] - padding, bounds[2] + padding)
+   ax.set_ylim(bounds[1] - padding, bounds[3] + padding)
+   # Add basemap tiles
+   ctx.add_basemap(ax, source=ctx.providers.OpenStreetMap.Mapnik, crs=admin.crs.to_string())
+   
+   for type, group in dataset.groupby("type"):
+       logger.debug(f"type - {type}: {len(group)}")
+       color = 'black' if type == 'suicide' else 'red'
+       marker = 'o' if type == 'suicide' else '^'
+       # Use GeoPandas plot
+       group.plot(
+           ax=ax,
+           marker=marker,
+           color=color,
+           markersize=sizes[group.index],
+           alpha=0.7,
+           edgecolor='black',  # helps visibility
+           linewidth=0.5,
+           zorder=5
+      )
+      #  ax.scatter(
+      #      group.geometry.x,
+      #      group.geometry.y,
+      #      s=20,
+      #      c='red',
+      #      marker='o',
+      #      alpha=0.7,
+      #      linewidths=0.5,
+      #      transform=None,
+      #      edgecolor='white',  # this helps points stand out
+      #      zorder=10  # ensure scatter is above basemap
+      #   )
 
    # Add title & legend
    ax.set_title(
-      "TITLE",
+      "Suicide and Drone Attacks (Size ~ Casualities)",
       fontsize=18,
       fontweight="bold",
       pad=20
    )
 
    # Define your color mapping for phases (for legend use, takes care of missing phases in the dataset)
-   phase_color_dict = {
-      1: '#fae61e', # Level 1
+   type_color_dict = {
+      'suicide': '#000000', # Level 1
+      'drone': '#ff0000', # Level 1
    }
    legend_elements = []
-   for phase, color in phase_color_dict.items():
+   for type, color in type_color_dict.items():
       legend_elements.append(Patch(facecolor=color, edgecolor=color,
-                                    label=f"Level {phase}"))
+                                    label=f"{type}"))
    
    # Beautify, add legend and save
    ax.legend(
@@ -156,8 +209,21 @@ def create_png(admin, dataset, output_path):
       frameon=True
    )
    ax.set_axis_off()
-   # plt.tight_layout()
+   plt.tight_layout()
    plt.savefig(output_path, dpi=500, bbox_inches="tight")
+
+def convert_df_to_gdf(dataset, lat_col, lon_col, input_crs: str='EPSG:4326'):
+   """
+   """
+   # Drop rows with missing lat/lon
+   dataset = dataset.dropna(subset=[lat_col, lon_col])
+
+   # Create Point geometry column
+   geometry = [Point(xy) for xy in zip(dataset[lon_col], dataset[lat_col])]
+   dataset_gdf = gpd.GeoDataFrame(dataset, geometry=geometry, crs=input_crs)
+
+   return dataset_gdf
+
 
 def generate_map(path_dir: str, filename: str):
    """    
@@ -169,12 +235,62 @@ def generate_map(path_dir: str, filename: str):
    admin_gdf = gpd.read_file(shapefile_path)
    admin_gdf = admin_gdf[['COUNTRY', 'NAME_1', 'geometry']]
 
-   # Load desired 
-   dataset = None
+   # Drone and Suicide attacks csvs
+   fp_suicide = "data/PAK_misc/zusmani_pakistansuicideattacks/PakistanSuicideAttacks Ver 11 (30-November-2017).csv"
+   fp_drone = "data/PAK_misc/zusmani_pakistandroneattacks/PakistanDroneAttacksWithTemp Ver 11 (November 30 2017).csv"
+   
+   # Read as pd dataset and then convert based on lat lon fields 
+   suicide_df = pd.read_csv(fp_suicide, encoding='latin1')
+   drone_df = pd.read_csv(fp_drone, encoding='latin1')
+   logger.debug(f"Length suicide_df - {len(suicide_df)}")
+   logger.debug(f"Length drone_df - {len(drone_df)}")
+
+   # Define sensitivity conditions for a drone strike
+   sensitivty_drone_conds = [
+      (drone_df["Women/Children  "] == 'Y') | (drone_df["Foreigners Min"] > 0),
+      (drone_df["Civilians Min"] > 0),
+      (drone_df["Al-Qaeda"] > 0) | (drone_df["Taliban"] > 0),
+   ]
+   # Define corresponding choices
+   choices = ["High", "Medium", "Low"]
+   # Use np.select to make the new column
+   drone_df["Sensitivity"] = np.select(sensitivty_drone_conds, choices, default="None")
+   
+   # Keep only necessary columns
+   suicide_df = suicide_df[['S#', 'Date', 'Latitude', 'Longitude', 'Location Sensitivity', 'Killed Max', 'Injured Max']]
+   drone_df = drone_df[['S#', 'Date', 'Latitude', 'Longitude', 'Sensitivity', 'Total Died Max', 'Injured Max']]
+   # Rename columns to match
+   suicide_df.rename(columns={
+       'Location Sensitivity':'Sensitivity',
+       }, inplace=True)
+   drone_df.rename(columns={
+       'Total Died Max':'Killed Max',
+       }, inplace=True)
+   
+   # Fix Sensitivity values where empty or wrong case
+   suicide_df["Sensitivity"] = suicide_df["Sensitivity"].fillna("None")
+   suicide_df.loc[suicide_df['Sensitivity'] == 'low', "Sensitivity"] = "Low"
+
+   # Assign type of attack
+   suicide_df['type'] = 'suicide'
+   drone_df['type'] = 'drone'
+
+   # concat/merge two dataframes
+   dataset = pd.concat([suicide_df, drone_df], axis=0, ignore_index=True)
+   # Convert to geo dataframe, assign geometries
+   dataset = convert_df_to_gdf(dataset, lat_col='Latitude',lon_col='Longitude')
+   logger.debug(f"Length dataset - {len(dataset)}")
+   logger.debug(f"Columns dataset - {dataset.columns}")
+   logger.debug(f"Sensitivity values (dataset) - {dataset['Sensitivity'].value_counts(dropna=False)}")
+   counts_by_origin = dataset.groupby(["type", "Sensitivity"]).size()
+   logger.debug(f"Sensitivity type - {counts_by_origin}")
+
+   # Clean extra data
+   del suicide_df, drone_df
 
    # Generate and save map
    output_path = f"{Path(path_dir).parent}/{filename}"
-   create_html(admin=admin_gdf, dataset=dataset, output_path=output_path)
+   # create_html(admin=admin_gdf, dataset=dataset, output_path=output_path)
    create_png(admin=admin_gdf, dataset=dataset, output_path=output_path)
 
    logger.info(f"Map created – open '{filename}' to view.")
@@ -184,5 +300,5 @@ if __name__ == "__main__":
     # Create a map where icons, pictograms, or custom symbols are the main focus. 
     # Use them to highlight points of interest or replace traditional cartographic features. 
     # Place icons for suicide attacks and use bomb icons?
-    filename = 'iconic'
+    filename = 'iconic_map'
     generate_map(path_dir=str(get_relative_path(__file__)), filename=filename)
