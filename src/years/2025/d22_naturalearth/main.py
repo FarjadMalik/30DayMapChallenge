@@ -9,6 +9,7 @@ from pyfonts import load_font
 from pypalettes import load_cmap
 import matplotlib.patheffects as path_effects
 from matplotlib.patches import Patch
+from matplotlib_scalebar.scalebar import ScaleBar
 from rasterio.mask import mask
 from branca.element import Template, MacroElement
 
@@ -88,9 +89,9 @@ def create_png(admin, glaciers_gdf, rivers_gdf, raster_arr, raster_transform, ou
       label="Rivers"
    )
 
-   # # Set limits and range from the center coordinates
-   # ax.set_xlim(center_lon - 9, center_lon + 9)
-   # ax.set_ylim(center_lat - 9, center_lat + 9)
+   # Set limits and range from the center coordinates
+   ax.set_xlim(center_lon - 9, center_lon + 9)
+   ax.set_ylim(center_lat - 9, center_lat + 9)
 
    # Add title & legend
    ax.set_title(
@@ -100,8 +101,19 @@ def create_png(admin, glaciers_gdf, rivers_gdf, raster_arr, raster_transform, ou
       pad=20
    )
 
+   # Define your color mapping for phases (for legend use, takes care of missing phases in the dataset)
+   type_color_dict = {
+      'Glacier': '#88ccee', 
+      'River': '#4477aa',
+   }
+   legend_elements = []
+   for type, color in type_color_dict.items():
+      legend_elements.append(Patch(facecolor=color, edgecolor=color,
+                                    label=f"{type}"))
+   
    # Add legend
    ax.legend(
+      handles=legend_elements,
       title="Artefacts",
       loc="upper left", # legend location
       facecolor="white",
@@ -110,19 +122,18 @@ def create_png(admin, glaciers_gdf, rivers_gdf, raster_arr, raster_transform, ou
       frameon=True
    )
 
-   #  # Add scale bar (uses matplotlib-scalebar)
-   #  scalebar = ScaleBar(
-   #      raster_transform.a, units="m", location="lower left",
-   #      pad=0.5, border_pad=0.5, color="black", frameon=True, box_alpha=0.5,
-   #  )
-   #  ax.add_artist(scalebar)
+   # Add scale bar (uses matplotlib-scalebar)
+   scalebar = ScaleBar(
+      raster_transform.a, units="m", location="lower left",
+      pad=0.5, border_pad=0.5, color="black", frameon=True, box_alpha=0.5, rotation='horizontal-only'
+   )
+   ax.add_artist(scalebar)
 
-   
    # Optional: add north arrow
    ax.annotate(
       "N",
-      xy=(0.95, 0.1),
-      xytext=(0.95, 0.2),
+      xy=(1.001, 0.7),
+      xytext=(1.001, 0.6),
       arrowprops=dict(facecolor="black", width=5, headwidth=15),
       ha="center",
       va="center",

@@ -174,8 +174,8 @@ def generate_map(path_dir: str, filename: str):
 
    # Generate and save map
    output_path = f"{Path(path_dir).parent}/{filename}"
-   create_html(admin=admin_gdf, dataset=dataset, output_path=output_path)
-   create_png(admin=admin_gdf, dataset=dataset, output_path=output_path)
+   # create_html(admin=admin_gdf, dataset=dataset, output_path=output_path)
+   # create_png(admin=admin_gdf, dataset=dataset, output_path=output_path)
 
    logger.info(f"Map created – open '{filename}' to view.")
 
