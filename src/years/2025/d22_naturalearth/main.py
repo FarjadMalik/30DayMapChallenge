@@ -1,4 +1,3 @@
-import folium
 import rasterio
 import numpy as np
 import geopandas as gpd
@@ -11,7 +10,6 @@ import matplotlib.patheffects as path_effects
 from matplotlib.patches import Patch
 from matplotlib_scalebar.scalebar import ScaleBar
 from rasterio.mask import mask
-from branca.element import Template, MacroElement
 
 from src.utils.logger import get_logger
 from src.utils.helpers import get_relative_path
