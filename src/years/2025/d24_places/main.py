@@ -44,6 +44,9 @@ def create_animation_fast(world, output_path, cmap_name="Abbott", simplify_toler
       sm._A = []  # required trick
       cbar = fig.colorbar(sm, ax=ax, orientation="vertical", shrink=0.6)
       cbar.set_label("Cantril Ladder Score")
+
+      # # Use this if the fig+colorbar is outside the loop, Clear only the map data, leave colorbar,
+      # ax.collections.clear()
       
       # Filter for the specific year and plot
       world_year = world[world["Year"] == year]
