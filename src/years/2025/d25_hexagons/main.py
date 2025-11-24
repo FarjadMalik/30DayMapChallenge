@@ -1,4 +1,5 @@
 import folium
+import pandas as pd
 import geopandas as gpd
 import matplotlib.pyplot as plt
 
@@ -165,24 +166,40 @@ def generate_map(path_dir: str, filename: str):
    logger.info(f"Generating {path_dir}")
    
    # Load the shapefile for boundaries or admin units
-   shapefile_path = "data/pakistan_admin/gadm41_PAK_1.shp"
-   admin_gdf = gpd.read_file(shapefile_path)
-   admin_gdf = admin_gdf[['COUNTRY', 'NAME_1', 'geometry']]
+   sudan_gdf = gpd.read_file("data/Sudan_misc/locality_polygon_mar20/Locality_Polygon_Mar20.shp")
+   logger.debug(f"Sudan GDF CRS: {sudan_gdf.crs}")
+   logger.debug(f"Sudan GDF Shape: {sudan_gdf.shape}")
+   logger.debug(f"Sudan GDF Columns: {sudan_gdf.columns}")
 
-   # Load desired 
-   dataset = None
+   # sudan_gdf = sudan_gdf[['COUNTRY', 'NAME_1', 'geometry']]
+
+   sudan_idp_df = pd.read_json("data/Sudan_misc/undp_internallydisplacedpeople.json")
+   logger.debug(f"Sudan IDPs head - {sudan_idp_df.head()}")
+   logger.debug(f"Sudan IDPs  Shape: {sudan_idp_df.shape}")
+   logger.debug(f"Sudan IDPs  Columns: {sudan_idp_df.columns}")
+
+   sudan_ref_df = pd.read_json("data/Sudan_misc/undp_selfrelocatedrefugees.json")
+   logger.debug(f"Sudan Self Ref head - {sudan_ref_df.head()}")
+   logger.debug(f"Sudan Self Ref  Shape: {sudan_ref_df.shape}")
+   logger.debug(f"Sudan Self Ref  Columns: {sudan_ref_df.columns}")
+
+
+   dfs = pd.read_excel("data/example.xlsx", sheet_name=None)
+   for name, frame in dfs.items():
+      logger.debug(f"Sheet: {name}")
+      logger.debug(frame.head())
+   
+
 
    # Generate and save map
    output_path = f"{Path(path_dir).parent}/{filename}"
-   create_html(admin=admin_gdf, dataset=dataset, output_path=output_path)
-   create_png(admin=admin_gdf, dataset=dataset, output_path=output_path)
+   # create_html(admin=admin_gdf, dataset=dataset, output_path=output_path)
+   # create_png(admin=admin_gdf, dataset=dataset, output_path=output_path)
 
    logger.info(f"Map created – open '{filename}' to view.")
 
 
 if __name__ == "__main__":
-    # Hexagons maps, of city growths?
-    # Challenge Classic: Use hexagonal binning (hexbins) or a hexagonal grid system to visualize your data. 
-    # Celebrate this beautiful and efficient tessellation!       
-    filename = 'hexagon_map'
+    # Tesselations over sudan and internally displaced people      
+    filename = 'sudan_idp_hexmap'
     generate_map(path_dir=str(get_relative_path(__file__)), filename=filename)

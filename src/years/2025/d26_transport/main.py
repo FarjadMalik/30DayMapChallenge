@@ -183,6 +183,6 @@ def generate_map(path_dir: str, filename: str):
 if __name__ == "__main__":
     # (World Sustainable Transport Day) Map mobility, traffic flow, 
     # public transit networks, logistics chains, or advocate for sustainable transport options.
-    # Public transport pakistan?
+    # Distance from port?
     filename = 'transport'
     generate_map(path_dir=str(get_relative_path(__file__)), filename=filename)
