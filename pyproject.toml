@@ -15,6 +15,7 @@ dependencies = [
     "h3==3.7.7",
     "h3pandas==0.2.6",
     "highlight-text==0.2",
+    "imageio-ffmpeg>=0.6.0",
     "ipykernel>=7.1.0",
     "isort>=7.0.0",
     "jupyter>=1.1.1",

@@ -2,8 +2,6 @@ import pandas as pd
 import geopandas as gpd
 import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
-import matplotlib.colors as colors
-import matplotlib.animation as animation
 
 from pathlib import Path
 from matplotlib import animation, colors, patches
