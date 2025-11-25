@@ -183,6 +183,6 @@ def generate_map(path_dir: str, filename: str):
 if __name__ == "__main__":
     # (Black Friday) Interpret the theme of Black. 
     # The map can be purely monochromatic, represent absence/darkness (e.g., light pollution), 
-    # or relate to themes of consumption. 
+    # or relate to themes of consumption.  data\deaths-in-armed-conflicts-based-on-where-they-occurred.csv
     filename = 'black'
     generate_map(path_dir=str(get_relative_path(__file__)), filename=filename)

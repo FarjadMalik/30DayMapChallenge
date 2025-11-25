@@ -209,5 +209,5 @@ def generate_map(path_dir: str, filename: str):
 
 
 if __name__ == "__main__":
-    filename = 'process_of_map'
-    generate_map(path_dir=str(get_relative_path(__file__)), filename=filename)
+   filename = 'process_of_map'
+   generate_map(path_dir=str(get_relative_path(__file__)), filename=filename)

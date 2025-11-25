@@ -255,6 +255,6 @@ def generate_map(path_dir: str, filename: str):
 
 
 if __name__ == "__main__":
-    # Tesselations over sudan and internally displaced people      
-    filename = 'sudan_idp_hexmap'
-    generate_map(path_dir=str(get_relative_path(__file__)), filename=filename)
+   # Tesselations over sudan and internally displaced people      
+   filename = 'sudan_idp_hexmap'
+   generate_map(path_dir=str(get_relative_path(__file__)), filename=filename)

@@ -181,6 +181,7 @@ def generate_map(path_dir: str, filename: str):
 
 
 if __name__ == "__main__":
-    # New world order as you see it, BRICS, NATO, Global South, Communists, Undecided etc
-    filename = 'boundaries'
-    generate_map(path_dir=str(get_relative_path(__file__)), filename=filename)
+   # New world order as you see it, BRICS, NATO, Global South, Communists, Undecided etc
+   # Map lines of division—political, physical, ecological, or conceptual. Explore the meaning and impact of a dividing line, real or perceived. 
+   filename = 'boundaries'
+   generate_map(path_dir=str(get_relative_path(__file__)), filename=filename)

@@ -181,6 +181,6 @@ def generate_map(path_dir: str, filename: str):
 
 
 if __name__ == "__main__":
-    # to be decided
+    # Add HDX graph from jospehbarbier here, A line graph gif with map over time (inflation, food prices, etc)
     filename = 'makeover'
     generate_map(path_dir=str(get_relative_path(__file__)), filename=filename)
