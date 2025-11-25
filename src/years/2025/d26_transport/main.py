@@ -131,7 +131,7 @@ def create_png(ports, lanes, output_path):
    # create fig and axis
    fig = plt.figure(figsize=(12, 10), dpi=300)
    ax = plt.axes(projection=proj)
-   # ax.set_extent([bounds[0], bounds[2], bounds[1], bounds[3]])
+   # Add land and ocean with natural colors
    ax.add_feature(cfeature.LAND, facecolor='#f0f0f0')
    ax.add_feature(cfeature.OCEAN, facecolor='#acceff')
    ax.add_feature(cfeature.COASTLINE, edgecolor='black', linewidth=0.8)
